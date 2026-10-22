@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Changes Log · Watchlist Builder</title>
+<meta name="description" content="Daily log of symbols added to and removed from TradingView's crypto exchange lists">
+<script src="shared.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="base.css">
+<style>
+/* Layout: pinned title, filter fields, summary with Copy, then one row per added or removed symbol. */
+.top { position: sticky; top: 0; z-index: 4; background: var(--bg); padding-block: max(16px, env(safe-area-inset-top, 0px)) 10px;
+  display: flex; align-items: baseline; gap: 10px; }
+.name { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; color: var(--fg); text-decoration: none; white-space: nowrap; }
+.name:hover { color: var(--accent); }
+.crumb { font-size: 14px; color: var(--muted); }
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.field { display: flex; align-items: center; gap: 8px; }
+select, input[type=search] { font: inherit; font-size: 13px; height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--surface); color: var(--fg); }
+select { max-width: 190px; }
+input[type=search] { width: 150px; font-family: var(--f-mono); text-transform: uppercase; }
+input[type=search]::placeholder { font-family: var(--f-body); text-transform: none; color: var(--muted); }
+select:focus-visible, input[type=search]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.count { font-size: 13px; color: var(--muted); font-family: var(--f-mono); }
+.tablewrap { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow: clip; margin-bottom: 24px; }
+table { width: 100%; table-layout: fixed; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+thead th { position: sticky; top: var(--head-h, 0px); background: var(--surface); font-size: 11px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--muted); box-shadow: inset 0 -1px 0 var(--line); }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: var(--row); }
+col.date { width: 68px; } col.ex { width: 30%; } col.chg { width: 120px; }
+td.date { color: var(--muted); font-size: 13px; }
+td.sym { font-family: var(--f-mono); font-size: 12.5px; }
+.badge { display: inline-block; font-size: 11.5px; font-weight: 500; padding: 1px 7px; border-radius: 4px; }
+.badge.add { color: var(--accent); background: var(--accent-soft); }
+.badge.del { color: var(--error); background: color-mix(in srgb, var(--error) 14%, transparent); }
+.src { font-size: 11px; color: var(--muted); margin-left: 6px; }
+td.empty { color: var(--muted); white-space: normal; padding: 18px 10px; }
+@media (max-width: 600px) {
+  .filters { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px 12px; } /* labels in one column, controls in the next */
+  .field { display: contents; }
+  col.date { width: 52px; } col.ex { width: 28%; } col.chg { width: 66px; }
+  th, td { padding: 7px 6px; }
+  .src { display: none; }
+  select { max-width: 150px; }
+  input[type=search] { width: 120px; }
+}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="top">
+    <a class="name" href="./">Watchlist Builder</a>
+    <span class="crumb">Changes log</span>
+  </header>
+
+  <section class="filters" aria-label="Filters">
+    <div class="field"><span class="lbl" id="venue-lbl">Venue</span>
+      <div class="grp" id="venues" role="group" aria-labelledby="venue-lbl">
+        <label class="chip"><input type="checkbox" value="cex" checked> CEX</label>
+        <label class="chip"><input type="checkbox" value="dex"> DEX</label>
+      </div>
+    </div>
+    <div class="field"><span class="lbl" id="quote-lbl">Quote</span>
+      <div class="grp" id="quotes" role="group" aria-labelledby="quote-lbl">
+        <label class="chip"><input type="checkbox" value="USDT" checked> USDT</label>
+        <label class="chip"><input type="checkbox" value="USDC"> USDC</label>
+      </div>
+    </div>
+    <div class="field"><span class="lbl" id="kind-lbl">Change</span>
+      <div class="grp" id="kinds" role="group" aria-labelledby="kind-lbl">
+        <label class="chip"><input type="checkbox" value="add" checked> Added</label>
+        <label class="chip"><input type="checkbox" value="del" checked> Removed</label>
+      </div>
+    </div>
+    <div class="field"><span class="lbl" id="period-lbl">Period</span>
+      <div class="seg" id="period" role="radiogroup" aria-labelledby="period-lbl">
+        <label><input type="radio" name="period" value="7"><span>7d</span></label>
+        <label><input type="radio" name="period" value="30" checked><span>30d</span></label>
+        <label><input type="radio" name="period" value="90"><span>90d</span></label>
+        <label><input type="radio" name="period" value="0"><span>All</span></label>
+      </div>
+    </div>
+    <div class="field"><label class="lbl" for="ex">Exchange</label>
+      <select id="ex"><option value="">All exchanges</option></select>
+    </div>
+    <div class="field"><label class="lbl" for="q">Ticker</label>
+      <input type="search" id="q" placeholder="e.g. PEPE" autocomplete="off" spellcheck="false">
+    </div>
+  </section>
+
+  <div class="summary">
+    <span class="count" id="count">Loading…</span>
+    <button type="button" class="btn ghost" id="copy" disabled>Copy symbols</button>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <colgroup><col class="date"><col class="ex"><col><col class="chg"></colgroup>
+      <thead><tr><th>Date</th><th>Exchange</th><th>Symbol</th><th>Change</th></tr></thead>
+      <tbody id="rows"><tr><td class="empty" colspan="4">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+// data/log.json is written once a day by .github/workflows/snapshot.yml (scripts/snapshot.py);
+// data/exchanges.json tags each exchange CEX or DEX. Filters are remembered in localStorage "wb-log".
+const STORE = "wb-log", SHOW = 1500;
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString("en-US");
+const checked = id => new Set([...$(id).querySelectorAll("input:checked")].map(i => i.value));
+const period = () => +document.querySelector("input[name=period]:checked").value;
+const fmtDay = d => new Date(d + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+let all = [], venueOf = {}, since = "", visible = [];
+
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify({ venues: [...checked("venues")], quotes: [...checked("quotes")], kinds: [...checked("kinds")],
+    period: String(period()), ex: $("ex").value, q: $("q").value })); } catch (_) {}
+}
+function restore() {
+  let st = {};
+  try { st = JSON.parse(localStorage.getItem(STORE)) || {}; } catch (_) {}
+  for (const id of ["venues", "quotes", "kinds"]) if (Array.isArray(st[id])) for (const i of $(id).querySelectorAll("input")) i.checked = st[id].includes(i.value);
+  if (["7", "30", "90", "0"].includes(st.period)) document.querySelector(`input[name=period][value="${st.period}"]`).checked = true;
+  if (typeof st.q === "string") $("q").value = st.q;
+  return st;
+}
+
+function fillExchanges(keep) {
+  const vs = checked("venues"), sel = $("ex"), current = keep ?? sel.value;
+  const exs = [...new Set(all.map(r => r.ex))].filter(ex => vs.has(venueOf[ex] || "cex"))
+    .sort((a, b) => (RANK[a] ?? Infinity) - (RANK[b] ?? Infinity) || exName(a).localeCompare(exName(b)));
+  sel.replaceChildren(new Option("All exchanges", ""), ...exs.map(ex => new Option(exName(ex), ex)));
+  sel.value = exs.includes(current) ? current : "";
+}
+
+function render() {
+  const vs = checked("venues"), qs = checked("quotes"), ks = checked("kinds"), ex = $("ex").value, q = $("q").value.trim().toUpperCase();
+  const days = period(), from = days ? new Date(Date.now() - days * 86400000).toISOString().slice(0, 10) : "";
+  visible = all.filter(r => r.date >= from && ks.has(r.kind) && qs.has(r.quote) && vs.has(venueOf[r.ex] || "cex")
+    && (!ex || r.ex === ex) && (!q || r.ticker.includes(q)));
+  const body = $("rows");
+  if (!visible.length) body.innerHTML = `<tr><td class="empty" colspan="4">No changes for these filters.</td></tr>`;
+  else {
+    body.replaceChildren(...visible.slice(0, SHOW).map(r => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td class="date"></td><td class="ex"></td><td class="sym"></td><td><span class="badge ${r.kind}"></span><span class="src"></span></td>`;
+      tr.children[0].textContent = fmtDay(r.date);
+      tr.children[1].textContent = exName(r.ex);
+      tr.children[2].textContent = r.ticker;
+      tr.children[2].title = r.s;
+      tr.querySelector(".badge").textContent = r.kind === "add" ? "Added" : "Removed";
+      tr.querySelector(".src").textContent = r.firstBar ? "first bar" : "";
+      return tr;
+    }));
+  }
+  const shown = Math.min(visible.length, SHOW);
+  $("count").textContent = `${fmt(visible.length)} changes` + (shown < visible.length ? ` · showing ${fmt(shown)}` : "") + ` · logged since ${fmtDay(since)}`;
+  $("copy").disabled = !visible.length;
+}
+
+function copyText(text) {
+  const fallback = () => {
+    const ta = Object.assign(document.createElement("textarea"), { value: text });
+    ta.style.cssText = "position:fixed;opacity:0"; document.body.append(ta); ta.select();
+    try { document.execCommand("copy"); } catch (_) {}
+    ta.remove();
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(fallback);
+  else fallback();
+}
+$("copy").addEventListener("click", e => {
+  copyText([...new Set(visible.map(r => r.s))].join(","));
+  const b = e.currentTarget; b.classList.add("done"); clearTimeout(b._done); b._done = setTimeout(() => b.classList.remove("done"), 900);
+});
+
+for (const id of ["quotes", "kinds", "period", "ex"]) $(id).addEventListener("change", () => { save(); render(); });
+$("venues").addEventListener("change", () => { fillExchanges(); save(); render(); });
+$("q").addEventListener("input", () => { save(); render(); });
+const topBar = document.querySelector(".top");
+new ResizeObserver(() => document.documentElement.style.setProperty("--head-h", `${topBar.offsetHeight}px`)).observe(topBar);
+
+(async () => {
+  const st = restore();
+  try {
+    const [log, venues] = await Promise.all(["data/log.json", "data/exchanges.json"].map(u => fetch(u, { cache: "no-store" }).then(r => { if (!r.ok) throw 0; return r.json(); })));
+    venueOf = venues; since = log.since;
+    for (const e of log.entries) for (const [kind, list] of [["add", e.added], ["del", e.removed]]) for (const s of list) {
+      const [ex, ticker] = s.split(":");
+      all.push({ date: e.date, ex, ticker, s, kind, firstBar: e.source === "first-bar", quote: ticker.includes("USDC") ? "USDC" : "USDT" });
+    }
+  } catch (_) {
+    $("count").textContent = "The log could not be loaded.";
+    $("rows").innerHTML = `<tr><td class="empty" colspan="4">The log could not be loaded.</td></tr>`;
+    return;
+  }
+  fillExchanges(st.ex || "");
+  render();
+})();
+</script>
+</body>
+</html>

@@ -72,9 +72,14 @@ const report = o => { const pre = document.createElement("pre"); pre.id = "check
 })();
 </script>
 JS
+cp -R base.css shared.js log.html data "$tmp/"
+port=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
+python3 -m http.server "$port" --bind 127.0.0.1 --directory "$tmp" >/dev/null 2>&1 & server=$!; disown
+trap 'kill $server 2>/dev/null; rm -rf "$tmp"' EXIT
+sleep 1
 "$CHROME" --headless=new --disable-gpu --user-data-dir="$tmp/profile" --virtual-time-budget=60000 \
-  --dump-dom "file://$tmp/probe.html" 2>/dev/null > "$tmp/dom.html"
-python3 -I - "$tmp/dom.html" <<'PY'
+  --dump-dom "http://127.0.0.1:$port/probe.html" 2>/dev/null > "$tmp/dom.html"
+CHECK_TMP="$tmp" CHECK_PORT="$port" CHROME="$CHROME" python3 -I - "$tmp/dom.html" <<'PY'
 import html, json, re, sys
 m = re.search(r'<pre id="check-result">(.*?)</pre>', open(sys.argv[1], encoding="utf-8").read(), re.S)
 if not m: sys.exit("FAIL: no result within 60 s")
@@ -97,5 +102,36 @@ if any(len(f) > 1000 for f in files): sys.exit("FAIL: a downloaded file exceeds 
 if sorted(s for f in files for s in f if not s.startswith("###")) != sorted(syms): sys.exit("FAIL: file symbols differ from the copied list")
 if r["separate"] < r["checked"]: sys.exit(f"FAIL: separate mode gave {r['separate']} lists for {r['checked']} cells")
 if any("###" in f for f in r["sepFiles"]): sys.exit("FAIL: sections still present with the option off")
-print(f"PASS: stale hidden by default {r['staleHidden']}, listed in 30d {r['listed30']}, {r['cexRows']} CEX, {r['rows']} CEX+DEX exchanges, {r['cells']} cells, together {len(lists)} lists, separate {r['separate']} lists, {len(syms)} symbols")
+# --- log.html: default filters (CEX, USDT, added + removed, 30 days) must show exactly what the data files hold
+import datetime, os, subprocess
+tmp, port = os.environ["CHECK_TMP"], os.environ["CHECK_PORT"]
+probe = open(f"{tmp}/log.html").read() + """<script>
+(function wait() {
+  if (document.getElementById("count").textContent.includes("changes")) {
+    const pre = document.createElement("pre"); pre.id = "check-result";
+    const first = document.getElementById("count").textContent;
+    const ex = document.getElementById("ex"); ex.value = "BINANCE"; ex.dispatchEvent(new Event("change"));
+    pre.textContent = JSON.stringify({ first, binance: document.getElementById("count").textContent,
+      options: ex.options.length, rows: document.querySelectorAll("#rows tr").length });
+    ex.value = ""; ex.dispatchEvent(new Event("change"));
+    document.body.append(pre);
+  } else setTimeout(wait, 100);
+})();
+</script>"""
+open(f"{tmp}/logprobe.html", "w").write(probe)
+dom = subprocess.run([os.environ["CHROME"], "--headless=new", "--disable-gpu", f"--user-data-dir={tmp}/profile2", "--virtual-time-budget=20000",
+  "--dump-dom", f"http://127.0.0.1:{port}/logprobe.html"], capture_output=True, text=True).stdout
+m = re.search(r'<pre id="check-result">(.*?)</pre>', dom, re.S)
+if not m: sys.exit("FAIL: log.html did not render")
+lr = json.loads(html.unescape(m.group(1)))
+log = json.load(open(f"{tmp}/data/log.json")); venue = json.load(open(f"{tmp}/data/exchanges.json"))
+start = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30)).strftime("%Y-%m-%d")
+rows = [s for e in log["entries"] if e["date"] >= start for s in e["added"] + e["removed"]
+        if venue.get(s.split(":")[0], "cex") == "cex" and "USDC" not in s.split(":")[1]]
+want = len(rows)
+got = int(lr["first"].split(" changes")[0].replace(",", ""))
+if got != want: sys.exit(f"FAIL: log.html shows {got} changes, data holds {want}")
+bn = int(lr["binance"].split(" changes")[0].replace(",", ""))
+if not (0 < bn < got) or lr["options"] < 10: sys.exit(f"FAIL: log.html exchange filter: {bn} of {got}, {lr['options']} options")
+print(f"PASS: stale hidden by default {r['staleHidden']}, listed in 30d {r['listed30']}, {r['cexRows']} CEX, {r['rows']} CEX+DEX exchanges, {r['cells']} cells, together {len(lists)} lists, separate {r['separate']} lists, {len(syms)} symbols; log.html {got} changes in 30d (Binance {bn})")
 PY

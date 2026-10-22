@@ -5,36 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Watchlist Builder</title>
 <meta name="description" content="Live USDT and USDC symbol lists from crypto exchanges, ready to import into TradingView: spot, perps, TradFi">
-<script>
-  // Settings are remembered for this site in this browser only (localStorage "wb-settings").
-  // The theme is applied here, before first paint; "auto" follows the system.
-  try { const t = (JSON.parse(localStorage.getItem("wb-settings")) || {}).theme; if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (_) {}
-</script>
+<script src="shared.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="base.css">
 <style>
 /* Layout: one column; quote chips, exchange × market matrix, sticky action bar, generated lists. */
-:root {
-  --bg: #F3F5F7; --surface: #FFFFFF; --fg: #131A20; --muted: #5A6570; --line: #D6DCE2; --row: #F7F9FA;
-  --accent: #0A6B75; --accent-soft: #DDEFF0; --accent-fg: #FFFFFF; --error: #B42318; --shadow: rgba(16, 24, 32, 0.14);
-  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #0E1317; --surface: #151C21; --fg: #E4E9ED; --muted: #8C98A3; --line: #2A3540; --row: #182026;
-  --accent: #4DBFC9; --accent-soft: #12333A; --accent-fg: #062126; --error: #F97066; --shadow: rgba(0, 0, 0, 0.55); color-scheme: dark } }
-:root[data-theme="dark"] {
-  --bg: #0E1317; --surface: #151C21; --fg: #E4E9ED; --muted: #8C98A3; --line: #2A3540; --row: #182026;
-  --accent: #4DBFC9; --accent-soft: #12333A; --accent-fg: #062126; --error: #F97066; --shadow: rgba(0, 0, 0, 0.55); color-scheme: dark }
-* { box-sizing: border-box; }
-[hidden] { display: none !important; } /* components below set display; hidden must still win */
-body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 14px; line-height: 1.4; }
-.wrap { max-width: 720px; margin: 0 auto;
-  padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px));
-  display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
-input[type=checkbox], input[type=radio] { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; flex: none; }
 /* Header: name on the left, quote choice and the settings gear on the right. */
 /* The header stays pinned while the table scrolls; the table's column headers stick right under it (--head-h). */
 .top { position: sticky; top: 0; z-index: 4; background: var(--bg); padding-block: max(16px, env(safe-area-inset-top, 0px)) 10px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "name quote gear";
@@ -48,11 +25,6 @@ input[type=checkbox], input[type=radio] { accent-color: var(--accent); width: 16
   .top { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name gear" "quote quote"; }
   .opts { justify-self: start; }
 }
-.grp { display: flex; flex-wrap: wrap; gap: 6px; }
-.lbl { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-.chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px;
-  background: var(--surface); cursor: pointer; user-select: none; font-size: 13px; font-weight: 500; }
-.chip:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .matrix { overflow: clip; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 /* Fixed layout: each visible market column gets 23% (or an equal share of 76% when there are many), the exchange column the rest. */
 table { width: 100%; table-layout: fixed; border-collapse: collapse; font-variant-numeric: tabular-nums; }
@@ -74,48 +46,23 @@ td.off { color: var(--muted); font-family: var(--f-mono); font-size: 12px; }
 .bar { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px;
   background: var(--bg); border-top: 1px solid var(--line); padding-block: 10px max(10px, env(safe-area-inset-bottom, 0px)); }
 .sel { font-size: 13px; color: var(--muted); font-family: var(--f-mono); }
-/* Round, the same height as the quote chips. */
-.icon { position: relative; width: 30px; height: 30px; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--line);
-  border-radius: 50%; background: var(--surface); color: var(--muted); cursor: pointer; }
-.icon:hover, .icon[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
-.icon svg { width: 16px; height: 16px; }
 /* Settings: a panel that opens below the gear, right-aligned to it. */
 .pop { position: absolute; z-index: 5; right: 0; top: calc(100% + 6px); width: min(300px, calc(100vw - 24px)); display: grid; gap: 12px; padding: 12px 14px;
   background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 28px var(--shadow); }
 .pop hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
+.pop-link { font-size: 13px; font-weight: 500; color: var(--accent); text-decoration: none; }
+.pop-link::after { content: " →"; }
+.pop-link:hover { text-decoration: underline; }
 .pop-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; }
 label.pop-row { cursor: pointer; }
-.seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 2px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); }
-.seg label { position: relative; cursor: pointer; }
-.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
-.seg span { display: block; padding: 5px 12px; border-radius: 5px; text-align: center; font-size: 13px; font-weight: 500; color: var(--muted); }
-.seg input:checked + span { background: var(--accent); color: var(--accent-fg); }
-.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
-.btn { font: inherit; font-weight: 500; border-radius: 6px; cursor: pointer; border: 1px solid var(--accent); text-decoration: none;
-  display: inline-block; white-space: nowrap; }
-.btn.primary { background: var(--accent); color: var(--accent-fg); height: 38px; padding: 0 18px; }
-.btn.primary:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn.ghost { background: transparent; color: var(--accent); padding: 4px 10px; font-size: 13px; }
-.btn.ghost:hover { background: var(--accent-soft); }
-.btn:focus-visible, .icon:focus-visible, .chip:has(input:focus-visible), label.c:has(input:focus-visible), textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 #out { display: grid; gap: 14px; padding-bottom: 24px; scroll-margin-top: 12px; }
 .list { display: grid; gap: 6px; }
 .list-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .list-head h2 { font-size: 14px; font-weight: 600; margin: 0; }
 .list-head .n { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
 .list-head .acts { margin-left: auto; display: flex; gap: 6px; align-items: center; }
-/* Click feedback on Copy / Download: a crisp press, then a filled check mark for a moment; no text, no fade. */
-.btn.ghost { position: relative; transition: transform 60ms ease-out; }
-.btn.ghost:active { transform: scale(0.96); }
-.btn.ghost.done { background: var(--accent); border-color: var(--accent); color: transparent; }
-.btn.ghost.done::after { content: ""; position: absolute; inset: 0; margin: auto; width: 14px; height: 14px; background: var(--accent-fg);
-  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6 9 17l-5-5'/></svg>") center / contain no-repeat;
-          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6 9 17l-5-5'/></svg>") center / contain no-repeat; }
-@media (prefers-reduced-motion: reduce) { .btn.ghost { transition: none; } .btn.ghost:active { transform: none; } }
 textarea { width: 100%; height: 64px; resize: vertical; font-family: var(--f-mono); font-size: 11.5px; line-height: 1.45;
   padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); }
-.note { font-size: 12.5px; color: var(--muted); margin: 0; }
-.note.error { color: var(--error); }
 table.dense td label.c, table.dense thead th:not(:first-child) label.c { flex-direction: column; justify-content: center; gap: 3px; min-height: 44px; padding-left: 2px; padding-right: 2px; }
 @media (max-width: 600px) {
   table.dense thead th { vertical-align: top; } /* checkboxes on one line, labels hang below */
@@ -186,6 +133,8 @@ table.dense td label.c, table.dense thead th:not(:first-child) label.c { flex-di
             <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
           </div>
         </div>
+        <hr>
+        <a class="pop-link" href="log.html">Changes log</a>
       </div>
     </div>
   </header>
@@ -212,18 +161,6 @@ table.dense td label.c, table.dense thead th:not(:first-child) label.c { flex-di
 const SCANNER = "https://scanner.tradingview.com/crypto/scan";
 const TV_LIMIT = 1000; // symbols per TradingView watchlist
 const STALE_DAYS = 7;  // "Hide stale": no price from TradingView for this long (a dead feed, a delisted pair)
-const KNOWN = [ // display names; these CEXes lead in this order, every other exchange follows by symbol count
-  ["BINANCE", "Binance"], ["BYBIT", "Bybit"], ["OKX", "OKX"], ["BITGET", "Bitget"], ["GATE", "Gate"], ["MEXC", "MEXC"],
-  ["KUCOIN", "KuCoin"], ["BINGX", "BingX"], ["HTX", "HTX"], ["COINBASE", "Coinbase"], ["KRAKEN", "Kraken"],
-  ["CRYPTOCOM", "Crypto.com"], ["UPBIT", "Upbit"], ["BITHUMB", "Bithumb"], ["BITFINEX", "Bitfinex"], ["WHITEBIT", "WhiteBIT"],
-  ["COINEX", "CoinEx"], ["LBANK", "LBank"], ["XTCOM", "XT.com"], ["PHEMEX", "Phemex"], ["BLOFIN", "BloFin"],
-  ["BITUNIX", "Bitunix"], ["WEEX", "WEEX"], ["TOOBIT", "Toobit"], ["ZOOMEX", "Zoomex"], ["KCEX", "KCEX"],
-  ["PIONEX", "Pionex"], ["DERIBIT", "Deribit"], ["WOONETWORK", "WOO X"], ["BTSE", "BTSE"], ["BYDFI", "BYDFi"],
-  ["BTCC", "BTCC"], ["COINW", "CoinW"], ["DEEPCOIN", "Deepcoin"], ["DELTAIN", "Delta India"], ["COINSWITCH", "CoinSwitch"],
-  ["POLONIEX", "Poloniex"], ["BITVAVO", "Bitvavo"], ["BITKUB", "Bitkub"], ["GEMINI", "Gemini"], ["BINANCEUS", "Binance.US"],
-  ["BITRUE", "Bitrue"], ["BITSTAMP", "Bitstamp"], ["COINJAR", "CoinJar"], ["BITAZZA", "Bitazza"], ["BITSO", "Bitso"],
-  ["BITFLYER", "bitFlyer"],
-];
 const BASE_KINDS = [["spot", "Spot"], ["perp", "Perps"]]; // dated futures left out: few under USDT/USDC, and they expire
 const TRADFI = [["tradfi", "TradFi"]];
 const TRADFI_SPLIT = [["stock", "Stocks"], ["index", "Indices"], ["metal", "Metals"], ["cmdty", "Commod."], ["fx", "FX"]];
@@ -246,30 +183,6 @@ function tradfiSub(symbol) {
   const root = symbol.split(":")[1].replace(/(USDT|USDC)(\.P|\d{2}[A-Z]\d{4})?$/, "");
   return (TF_RULES.find(([, re]) => re.test(root)) || ["stock"])[0];
 }
-const NAME = Object.fromEntries(KNOWN), RANK = Object.fromEntries(KNOWN.map(([id], i) => [id, i]));
-// DEX ids glue protocol, version and chain together (PANCAKESWAP3BSC); split them for display.
-// Unknown parts fall back to the raw id, so a new DEX still shows up, just less prettily.
-const DEX_PROTOCOLS = [["PANCAKESWAP", "PancakeSwap"], ["UNISWAP", "Uniswap"], ["RAYDIUM", "Raydium"], ["CURVE", "Curve"],
-  ["CAMELOT", "Camelot"], ["PULSEX", "PulseX"], ["KATANA", "Katana"], ["STONFI", "STON.fi"], ["QUICKSWAP", "QuickSwap"],
-  ["SUSHISWAP", "SushiSwap"], ["VELODROME", "Velodrome"], ["AERODROME", "Aerodrome"], ["METEORA", "Meteora"], ["TRADERJOE", "Trader Joe"],
-  ["SPOOKYSWAP", "SpookySwap"], ["SUNSWAP", "SunSwap"], ["ORCA", "Orca"], ["CETUS", "Cetus"], ["BLUEFIN", "Bluefin"], ["DEDUST", "DeDust"],
-  ["BISWAP", "Biswap"], ["BASESWAP", "BaseSwap"], ["PANGOLIN", "Pangolin"], ["PHARAOH", "Pharaoh"], ["HONEYSWAP", "Honeyswap"],
-  ["MMFINANCE", "MM Finance"], ["VVSFINANCE", "VVS Finance"], ["VVS", "VVS Finance"], ["SYNCSWAP", "SyncSwap"], ["BLACKHOLE", "Blackhole"],
-  ["LFJ", "LFJ"], ["TURBOSFINANCE", "Turbos Finance"], ["RAMSES", "Ramses"], ["ZKSWAP", "ZKSwap"]];
-const DEX_CHAINS = [["ETH", "Ethereum"], ["BSC", "BNB Chain"], ["BASE", "Base"], ["ARBITRUM", "Arbitrum"], ["POLYGON", "Polygon"],
-  ["OPTIMISM", "Optimism"], ["AVALANCHE", "Avalanche"], ["ZKSYNC", "zkSync"], ["UNICHAIN", "Unichain"]];
-const DEX_VARIANTS = { "2DOT2": "v2.2", CLMM: "CLMM", CPMM: "CPMM", DLMM: "DLMM", DYN: "Dynamic", SLIPSTREAM: "Slipstream" };
-function exParts(ex) {
-  if (NAME[ex]) return { title: NAME[ex], sub: "" };
-  const p = DEX_PROTOCOLS.find(([id]) => ex.startsWith(id));
-  if (!p) return { title: ex, sub: "" };
-  let rest = ex.slice(p[0].length);
-  const c = DEX_CHAINS.find(([id]) => rest.endsWith(id));
-  if (c) rest = rest.slice(0, -c[0].length);
-  const variant = /^\d+$/.test(rest) ? `v${rest}` : DEX_VARIANTS[rest] ?? rest;
-  return { title: p[1], sub: [variant, c && c[1]].filter(Boolean).join(" · ") };
-}
-const exName = ex => { const { title, sub } = exParts(ex); return sub ? `${title} ${sub}` : title; };
 
 const kindOf = (type, base) => type === "spot" ? "spot" : !base ? "tradfi" : "perp";
 const key = (ex, k) => `${ex}|${k}`;

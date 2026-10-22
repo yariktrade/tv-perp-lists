@@ -4,6 +4,7 @@ Run by .github/workflows/snapshot.yml once a day (and by hand: `python3 scripts/
 Queries the public TradingView scanner anonymously, the same request the page makes.
 
 data/symbols.json  the latest symbol set: {"date", "count", "symbols": [...]}
+data/exchanges.json  {exchange: "cex" | "dex"} from TradingView's centralization tag (log.html filters by it).
 data/log.json      {"since", "entries": [{"date", "added", "removed"[, "source"]}]}, newest first.
                    A symbol counts as present while TradingView lists it, so removals show up when
                    TradingView drops a delisted symbol (it does so within a month); the page's
@@ -28,7 +29,7 @@ MIN_SHARE = 0.8  # a response this much smaller than the last one is treated as 
 
 def fetch() -> list[dict]:
     body = {
-        "columns": ["first_bar_time"],
+        "columns": ["first_bar_time", "exchange", "centralization"],
         "range": [0, 300000],
         "filter": [
             {"left": "type", "operation": "in_range", "right": ["spot", "swap"]},
@@ -37,7 +38,7 @@ def fetch() -> list[dict]:
     }
     req = urllib.request.Request(SCANNER, data=json.dumps(body).encode(), headers={"Content-Type": "text/plain"})
     with urllib.request.urlopen(req, timeout=60) as r:
-        return [{"s": x["s"], "first": x["d"][0]} for x in json.load(r)["data"]]
+        return [{"s": x["s"], "first": x["d"][0], "ex": x["d"][1], "v": x["d"][2]} for x in json.load(r)["data"]]
 
 
 def day(ts: float) -> str:
@@ -78,6 +79,12 @@ def main() -> int:
         ]}
         print(f"{today}: baseline of {len(current)} symbols, {sum(len(s) for s in by_day.values())} additions backfilled")
 
+    tags = defaultdict(lambda: defaultdict(int))
+    for r in rows:
+        if r["v"]:
+            tags[r["ex"]][r["v"]] += 1
+    venues = {ex: ("dex" if tags[ex]["dex"] > tags[ex]["cex"] else "cex") for ex in sorted({r["ex"] for r in rows})}
+    (DATA / "exchanges.json").write_text(json.dumps(venues, separators=(",", ":")))
     sym_path.write_text(json.dumps({"date": today, "count": len(current), "symbols": current}, separators=(",", ":")))
     log_path.write_text(json.dumps(log, separators=(",", ":")))
     return 0
