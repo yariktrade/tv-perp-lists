@@ -110,10 +110,19 @@ probe = open(f"{tmp}/log.html").read() + """<script>
   if (document.getElementById("count").textContent.includes("changes")) {
     const pre = document.createElement("pre"); pre.id = "check-result";
     const first = document.getElementById("count").textContent;
+    // calendar: click Oct 15 and Oct 20, 2026 (walking back months if needed)
+    const day = d => document.querySelector(`#days button[data-date="${d}"]`);
+    for (let i = 0; i < 36 && !day("2026-10-15"); i++) document.getElementById("prev").click();
+    document.querySelector(".hbtn[data-pop=p-date]").click();
+    day("2026-10-15").click(); day("2026-10-20").click();
+    if (document.getElementById("p-date").hidden) { const pre = document.createElement("pre"); pre.id = "check-result";
+      pre.textContent = JSON.stringify({ error: "the date menu closed on a calendar click" }); document.body.append(pre); return; }
+    const range = document.getElementById("count").textContent;
+    document.querySelector('input[name=period][value="30"]').click();
     const boxes = [...document.querySelectorAll("#exlist input[name=ex]")];
     boxes.forEach(i => { i.checked = i.value === "BINANCE"; });
     document.getElementById("exlist").dispatchEvent(new Event("change", { bubbles: true }));
-    pre.textContent = JSON.stringify({ first, binance: document.getElementById("count").textContent,
+    pre.textContent = JSON.stringify({ first, range, binance: document.getElementById("count").textContent,
       options: boxes.length, rows: document.querySelectorAll("#rows tr").length });
     document.body.append(pre);
   } else setTimeout(wait, 100);
@@ -125,6 +134,7 @@ dom = subprocess.run([os.environ["CHROME"], "--headless=new", "--disable-gpu", f
 m = re.search(r'<pre id="check-result">(.*?)</pre>', dom, re.S)
 if not m: sys.exit("FAIL: log.html did not render")
 lr = json.loads(html.unescape(m.group(1)))
+if "error" in lr: sys.exit("FAIL: log.html " + lr["error"])
 log = json.load(open(f"{tmp}/data/log.json")); venue = json.load(open(f"{tmp}/data/exchanges.json"))
 start = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30)).strftime("%Y-%m-%d")
 rows = [s for e in log["entries"] if e["date"] >= start for s in e["added"] + e["removed"]
@@ -132,7 +142,11 @@ rows = [s for e in log["entries"] if e["date"] >= start for s in e["added"] + e[
 want = len(rows)
 got = int(lr["first"].split(" changes")[0].replace(",", ""))
 if got != want: sys.exit(f"FAIL: log.html shows {got} changes, data holds {want}")
+rng = int(lr["range"].split(" changes")[0].replace(",", ""))
+want_rng = sum(1 for e in log["entries"] if "2026-10-15" <= e["date"] <= "2026-10-20" for s in e["added"] + e["removed"]
+               if venue.get(s.split(":")[0], "cex") == "cex" and "USDC" not in s.split(":")[1])
+if rng != want_rng: sys.exit(f"FAIL: log.html calendar Oct 15-20 shows {rng}, data holds {want_rng}")
 bn = int(lr["binance"].split(" changes")[0].replace(",", ""))
 if not (0 < bn < got) or lr["options"] < 10: sys.exit(f"FAIL: log.html exchange filter: {bn} of {got}, {lr['options']} options")
-print(f"PASS: stale hidden by default {r['staleHidden']}, listed in 30d {r['listed30']}, {r['cexRows']} CEX, {r['rows']} CEX+DEX exchanges, {r['cells']} cells, together {len(lists)} lists, separate {r['separate']} lists, {len(syms)} symbols; log.html {got} changes in 30d (Binance {bn})")
+print(f"PASS: stale hidden by default {r['staleHidden']}, listed in 30d {r['listed30']}, {r['cexRows']} CEX, {r['rows']} CEX+DEX exchanges, {r['cells']} cells, together {len(lists)} lists, separate {r['separate']} lists, {len(syms)} symbols; log.html {got} changes in 30d, {rng} on Oct 15-20 (Binance {bn})")
 PY
