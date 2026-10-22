@@ -110,10 +110,11 @@ probe = open(f"{tmp}/log.html").read() + """<script>
   if (document.getElementById("count").textContent.includes("changes")) {
     const pre = document.createElement("pre"); pre.id = "check-result";
     const first = document.getElementById("count").textContent;
-    const ex = document.getElementById("ex"); ex.value = "BINANCE"; ex.dispatchEvent(new Event("change"));
+    const boxes = [...document.querySelectorAll("#exlist input[name=ex]")];
+    boxes.forEach(i => { i.checked = i.value === "BINANCE"; });
+    document.getElementById("exlist").dispatchEvent(new Event("change", { bubbles: true }));
     pre.textContent = JSON.stringify({ first, binance: document.getElementById("count").textContent,
-      options: ex.options.length, rows: document.querySelectorAll("#rows tr").length });
-    ex.value = ""; ex.dispatchEvent(new Event("change"));
+      options: boxes.length, rows: document.querySelectorAll("#rows tr").length });
     document.body.append(pre);
   } else setTimeout(wait, 100);
 })();

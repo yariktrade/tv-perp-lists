@@ -11,89 +11,66 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="base.css">
 <style>
-/* Layout: pinned title, filter fields, summary with Copy, then one row per added or removed symbol. */
-.top { position: sticky; top: 0; z-index: 4; background: var(--bg); padding-block: max(16px, env(safe-area-inset-top, 0px)) 10px;
-  display: flex; align-items: baseline; gap: 10px; }
-.name { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; color: var(--fg); text-decoration: none; white-space: nowrap; }
-.name:hover { color: var(--accent); }
-.crumb { font-size: 14px; color: var(--muted); }
-.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
-.field { display: flex; align-items: center; gap: 8px; }
-select, input[type=search] { font: inherit; font-size: 13px; height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px;
-  background: var(--surface); color: var(--fg); }
-select { max-width: 190px; }
-input[type=search] { width: 150px; font-family: var(--f-mono); text-transform: uppercase; }
-input[type=search]::placeholder { font-family: var(--f-body); text-transform: none; color: var(--muted); }
-select:focus-visible, input[type=search]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Layout: pinned back arrow and title; count with Copy; a table whose column headers open the filters. */
+.top { position: sticky; top: 0; z-index: 6; background: var(--bg); padding-block: max(16px, env(safe-area-inset-top, 0px)) 10px;
+  display: flex; align-items: center; gap: 10px; }
+.top h1 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+a.icon { text-decoration: none; }
 .summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .count { font-size: 13px; color: var(--muted); font-family: var(--f-mono); }
-.tablewrap { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow: clip; margin-bottom: 24px; }
+.tablewrap { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); margin-bottom: 24px; }
 table { width: 100%; table-layout: fixed; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-thead th { position: sticky; top: var(--head-h, 0px); background: var(--surface); font-size: 11px; font-weight: 500; text-transform: uppercase;
-  letter-spacing: 0.05em; color: var(--muted); box-shadow: inset 0 -1px 0 var(--line); }
+thead th { position: sticky; top: var(--head-h, 0px); z-index: 2; background: var(--surface); padding: 0; overflow: visible; box-shadow: inset 0 -1px 0 var(--line); }
+thead th:first-child { border-top-left-radius: 8px; } thead th:last-child { border-top-right-radius: 8px; }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--row); }
-col.date { width: 68px; } col.ex { width: 30%; } col.chg { width: 120px; }
+col.date { width: 76px; } col.ex { width: 30%; } col.chg { width: 110px; }
 td.date { color: var(--muted); font-size: 13px; }
 td.sym { font-family: var(--f-mono); font-size: 12.5px; }
 .badge { display: inline-block; font-size: 11.5px; font-weight: 500; padding: 1px 7px; border-radius: 4px; }
 .badge.add { color: var(--accent); background: var(--accent-soft); }
 .badge.del { color: var(--error); background: color-mix(in srgb, var(--error) 14%, transparent); }
-.src { font-size: 11px; color: var(--muted); margin-left: 6px; }
 td.empty { color: var(--muted); white-space: normal; padding: 18px 10px; }
+/* Column header = filter button; it turns accent while its filter hides something. */
+.hbtn { width: 100%; display: flex; align-items: center; gap: 6px; padding: 9px 10px; border: 0; background: none; cursor: pointer; font: inherit;
+  font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); text-align: left; }
+.hbtn span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.hbtn svg { width: 12px; height: 12px; flex: none; }
+.hbtn.on { color: var(--accent); }
+.hbtn:hover { color: var(--fg); } .hbtn.on:hover { color: var(--accent); }
+.hbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.hpop { position: absolute; z-index: 8; top: calc(100% + 4px); left: 0; width: min(260px, calc(100vw - 24px)); display: grid; gap: 8px; padding: 10px 12px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 28px var(--shadow);
+  text-transform: none; letter-spacing: normal; font-size: 13px; font-weight: 400; color: var(--fg); white-space: normal; }
+th:nth-child(n+3) .hpop { left: auto; right: 0; }
+.opt { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; }
+.opt span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.opt small { margin-left: auto; color: var(--muted); font-family: var(--f-mono); font-size: 11px; }
+.group { font-weight: 600; }
+.exlist { display: grid; gap: 0; max-height: min(50vh, 360px); overflow: auto; padding-right: 4px; }
+.exlist .opt:not(.group) { padding-left: 22px; }
+.hpop input[type=search] { width: 100%; height: 30px; padding: 0 10px; font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--bg); color: var(--fg); }
+.hpop input[type=search].mono { font-family: var(--f-mono); text-transform: uppercase; }
+.hpop input[type=search]::placeholder { font-family: var(--f-body); text-transform: none; color: var(--muted); }
+.hpop input[type=search]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.hpop hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
 @media (max-width: 600px) {
-  .filters { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px 12px; } /* labels in one column, controls in the next */
-  .field { display: contents; }
-  col.date { width: 52px; } col.ex { width: 28%; } col.chg { width: 66px; }
+  col.date { width: 66px; } col.ex { width: 29%; } col.chg { width: 82px; }
   th, td { padding: 7px 6px; }
-  .src { display: none; }
-  select { max-width: 150px; }
-  input[type=search] { width: 120px; }
+  .hbtn { padding: 9px 6px; letter-spacing: 0.02em; }
 }
 </style>
 </head>
 <body>
 <main class="wrap">
   <header class="top">
-    <a class="name" href="./">Watchlist Builder</a>
-    <span class="crumb">Changes log</span>
+    <a class="icon" href="./" aria-label="Back to Watchlist Builder">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+    </a>
+    <h1>Changes log</h1>
   </header>
-
-  <section class="filters" aria-label="Filters">
-    <div class="field"><span class="lbl" id="venue-lbl">Venue</span>
-      <div class="grp" id="venues" role="group" aria-labelledby="venue-lbl">
-        <label class="chip"><input type="checkbox" value="cex" checked> CEX</label>
-        <label class="chip"><input type="checkbox" value="dex"> DEX</label>
-      </div>
-    </div>
-    <div class="field"><span class="lbl" id="quote-lbl">Quote</span>
-      <div class="grp" id="quotes" role="group" aria-labelledby="quote-lbl">
-        <label class="chip"><input type="checkbox" value="USDT" checked> USDT</label>
-        <label class="chip"><input type="checkbox" value="USDC"> USDC</label>
-      </div>
-    </div>
-    <div class="field"><span class="lbl" id="kind-lbl">Change</span>
-      <div class="grp" id="kinds" role="group" aria-labelledby="kind-lbl">
-        <label class="chip"><input type="checkbox" value="add" checked> Added</label>
-        <label class="chip"><input type="checkbox" value="del" checked> Removed</label>
-      </div>
-    </div>
-    <div class="field"><span class="lbl" id="period-lbl">Period</span>
-      <div class="seg" id="period" role="radiogroup" aria-labelledby="period-lbl">
-        <label><input type="radio" name="period" value="7"><span>7d</span></label>
-        <label><input type="radio" name="period" value="30" checked><span>30d</span></label>
-        <label><input type="radio" name="period" value="90"><span>90d</span></label>
-        <label><input type="radio" name="period" value="0"><span>All</span></label>
-      </div>
-    </div>
-    <div class="field"><label class="lbl" for="ex">Exchange</label>
-      <select id="ex"><option value="">All exchanges</option></select>
-    </div>
-    <div class="field"><label class="lbl" for="q">Ticker</label>
-      <input type="search" id="q" placeholder="e.g. PEPE" autocomplete="off" spellcheck="false">
-    </div>
-  </section>
 
   <div class="summary">
     <span class="count" id="count">Loading…</span>
@@ -103,7 +80,40 @@ td.empty { color: var(--muted); white-space: normal; padding: 18px 10px; }
   <div class="tablewrap">
     <table>
       <colgroup><col class="date"><col class="ex"><col><col class="chg"></colgroup>
-      <thead><tr><th>Date</th><th>Exchange</th><th>Symbol</th><th>Change</th></tr></thead>
+      <thead><tr>
+        <th>
+          <button type="button" class="hbtn" data-pop="p-date" aria-expanded="false"><span>Date</span>CHEVRON</button>
+          <div class="hpop" id="p-date" hidden>
+            <label class="opt"><input type="radio" name="period" value="7"><span>Last 7 days</span></label>
+            <label class="opt"><input type="radio" name="period" value="30" checked><span>Last 30 days</span></label>
+            <label class="opt"><input type="radio" name="period" value="90"><span>Last 90 days</span></label>
+            <label class="opt"><input type="radio" name="period" value="0"><span>All time</span></label>
+          </div>
+        </th>
+        <th>
+          <button type="button" class="hbtn" data-pop="p-ex" aria-expanded="false"><span>Exchange</span>CHEVRON</button>
+          <div class="hpop" id="p-ex" hidden>
+            <input type="search" id="exfind" placeholder="Find exchange" autocomplete="off" spellcheck="false" aria-label="Find exchange">
+            <div class="exlist" id="exlist"></div>
+          </div>
+        </th>
+        <th>
+          <button type="button" class="hbtn" data-pop="p-sym" aria-expanded="false"><span>Symbol</span>CHEVRON</button>
+          <div class="hpop" id="p-sym" hidden>
+            <input type="search" class="mono" id="q" placeholder="Ticker, e.g. PEPE" autocomplete="off" spellcheck="false" aria-label="Ticker">
+            <hr>
+            <label class="opt"><input type="checkbox" name="quote" value="USDT" checked><span>USDT</span></label>
+            <label class="opt"><input type="checkbox" name="quote" value="USDC"><span>USDC</span></label>
+          </div>
+        </th>
+        <th>
+          <button type="button" class="hbtn" data-pop="p-chg" aria-expanded="false"><span>Change</span>CHEVRON</button>
+          <div class="hpop" id="p-chg" hidden>
+            <label class="opt"><input type="checkbox" name="kind" value="add" checked><span>Added</span></label>
+            <label class="opt"><input type="checkbox" name="kind" value="del" checked><span>Removed</span></label>
+          </div>
+        </th>
+      </tr></thead>
       <tbody id="rows"><tr><td class="empty" colspan="4">Loading…</td></tr></tbody>
     </table>
   </div>
@@ -113,57 +123,115 @@ td.empty { color: var(--muted); white-space: normal; padding: 18px 10px; }
 // data/log.json is written once a day by .github/workflows/snapshot.yml (scripts/snapshot.py);
 // data/exchanges.json tags each exchange CEX or DEX. Filters are remembered in localStorage "wb-log".
 const STORE = "wb-log", SHOW = 1500;
+const CHEVRON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>`;
+for (const b of document.querySelectorAll(".hbtn")) b.innerHTML = b.innerHTML.replace("CHEVRON", CHEVRON);
 const $ = id => document.getElementById(id);
 const fmt = n => n.toLocaleString("en-US");
-const checked = id => new Set([...$(id).querySelectorAll("input:checked")].map(i => i.value));
-const period = () => +document.querySelector("input[name=period]:checked").value;
+const values = (name, all) => [...document.querySelectorAll(`input[name=${name}]${all ? "" : ":checked"}`)].map(i => i.value);
+const period = () => +values("period")[0];
 const fmtDay = d => new Date(d + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-let all = [], venueOf = {}, since = "", visible = [];
+let all = [], venueOf = {}, visible = [], exchanges = [];
+const venue = ex => venueOf[ex] || "cex";
 
+// ---- header popovers: one open at a time, closed by a click outside or Escape
+function openPop(btn, open) {
+  for (const b of document.querySelectorAll(".hbtn")) {
+    const on = open && b === btn;
+    $(b.dataset.pop).hidden = !on;
+    b.setAttribute("aria-expanded", String(on));
+  }
+  if (open) { const f = $(btn.dataset.pop).querySelector("input[type=search], input:checked, input"); if (f) f.focus(); }
+}
+for (const b of document.querySelectorAll(".hbtn")) b.addEventListener("click", () => openPop(b, $(b.dataset.pop).hidden));
+document.addEventListener("click", e => { if (!e.target.closest("thead th")) openPop(null, false); });
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  const b = document.querySelector('.hbtn[aria-expanded="true"]');
+  if (b) { openPop(null, false); b.focus(); }
+});
+
+// ---- exchange list: CEX and DEX groups, each with a group checkbox
+function buildExchanges(picked) {
+  const box = $("exlist");
+  box.replaceChildren();
+  for (const v of ["cex", "dex"]) {
+    const list = exchanges.filter(ex => venue(ex) === v);
+    if (!list.length) continue;
+    const g = document.createElement("label");
+    g.className = "opt group";
+    g.innerHTML = `<input type="checkbox" data-group="${v}"><span>${v.toUpperCase()}</span><small>${list.length}</small>`;
+    box.append(g);
+    for (const ex of list) {
+      const l = document.createElement("label");
+      l.className = "opt";
+      l.dataset.find = `${ex} ${exName(ex)}`.toUpperCase();
+      l.innerHTML = `<input type="checkbox" name="ex"><span></span>`;
+      l.querySelector("input").value = ex;
+      l.querySelector("input").checked = picked.on.includes(ex) || (!picked.off.includes(ex) && v === "cex");
+      l.querySelector("span").textContent = exName(ex);
+      box.append(l);
+    }
+  }
+  syncGroups();
+}
+function syncGroups() {
+  for (const g of document.querySelectorAll("#exlist [data-group]")) {
+    const boxes = [...document.querySelectorAll("#exlist input[name=ex]")].filter(i => venue(i.value) === g.dataset.group);
+    const on = boxes.filter(i => i.checked).length;
+    g.checked = on === boxes.length; g.indeterminate = on > 0 && on < boxes.length;
+  }
+}
+$("exlist").addEventListener("change", e => {
+  const g = e.target.dataset.group;
+  if (g) for (const i of document.querySelectorAll("#exlist input[name=ex]")) if (venue(i.value) === g) i.checked = e.target.checked;
+  syncGroups(); save(); render();
+});
+$("exfind").addEventListener("input", e => {
+  const q = e.target.value.trim().toUpperCase();
+  for (const l of document.querySelectorAll("#exlist .opt:not(.group)")) l.hidden = !!q && !l.dataset.find.includes(q);
+});
+
+// ---- filter state
 function save() {
-  try { localStorage.setItem(STORE, JSON.stringify({ venues: [...checked("venues")], quotes: [...checked("quotes")], kinds: [...checked("kinds")],
-    period: String(period()), ex: $("ex").value, q: $("q").value })); } catch (_) {}
+  const exAll = values("ex", true), exOn = values("ex");
+  try { localStorage.setItem(STORE, JSON.stringify({ period: String(period()), exOn, exOff: exAll.filter(ex => !exOn.includes(ex)),
+    quotes: values("quote"), kinds: values("kind"), q: $("q").value })); }
+  catch (_) {}
 }
 function restore() {
   let st = {};
   try { st = JSON.parse(localStorage.getItem(STORE)) || {}; } catch (_) {}
-  for (const id of ["venues", "quotes", "kinds"]) if (Array.isArray(st[id])) for (const i of $(id).querySelectorAll("input")) i.checked = st[id].includes(i.value);
   if (["7", "30", "90", "0"].includes(st.period)) document.querySelector(`input[name=period][value="${st.period}"]`).checked = true;
+  for (const name of ["quote", "kind"]) if (Array.isArray(st[name + "s"])) for (const i of document.querySelectorAll(`input[name=${name}]`)) i.checked = st[name + "s"].includes(i.value);
   if (typeof st.q === "string") $("q").value = st.q;
-  return st;
+  return { on: Array.isArray(st.exOn) ? st.exOn : [], off: Array.isArray(st.exOff) ? st.exOff : [] };
 }
-
-function fillExchanges(keep) {
-  const vs = checked("venues"), sel = $("ex"), current = keep ?? sel.value;
-  const exs = [...new Set(all.map(r => r.ex))].filter(ex => vs.has(venueOf[ex] || "cex"))
-    .sort((a, b) => (RANK[a] ?? Infinity) - (RANK[b] ?? Infinity) || exName(a).localeCompare(exName(b)));
-  sel.replaceChildren(new Option("All exchanges", ""), ...exs.map(ex => new Option(exName(ex), ex)));
-  sel.value = exs.includes(current) ? current : "";
+function markActive() {
+  const narrowed = { "p-date": period() !== 0, "p-ex": values("ex").length < values("ex", true).length,
+    "p-sym": !!$("q").value.trim() || values("quote").length < 2, "p-chg": values("kind").length < 2 };
+  for (const b of document.querySelectorAll(".hbtn")) b.classList.toggle("on", narrowed[b.dataset.pop]);
 }
 
 function render() {
-  const vs = checked("venues"), qs = checked("quotes"), ks = checked("kinds"), ex = $("ex").value, q = $("q").value.trim().toUpperCase();
+  const exs = new Set(values("ex")), qs = new Set(values("quote")), ks = new Set(values("kind")), q = $("q").value.trim().toUpperCase();
   const days = period(), from = days ? new Date(Date.now() - days * 86400000).toISOString().slice(0, 10) : "";
-  visible = all.filter(r => r.date >= from && ks.has(r.kind) && qs.has(r.quote) && vs.has(venueOf[r.ex] || "cex")
-    && (!ex || r.ex === ex) && (!q || r.ticker.includes(q)));
+  visible = all.filter(r => r.date >= from && ks.has(r.kind) && qs.has(r.quote) && exs.has(r.ex) && (!q || r.ticker.includes(q)));
   const body = $("rows");
   if (!visible.length) body.innerHTML = `<tr><td class="empty" colspan="4">No changes for these filters.</td></tr>`;
-  else {
-    body.replaceChildren(...visible.slice(0, SHOW).map(r => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td class="date"></td><td class="ex"></td><td class="sym"></td><td><span class="badge ${r.kind}"></span><span class="src"></span></td>`;
-      tr.children[0].textContent = fmtDay(r.date);
-      tr.children[1].textContent = exName(r.ex);
-      tr.children[2].textContent = r.ticker;
-      tr.children[2].title = r.s;
-      tr.querySelector(".badge").textContent = r.kind === "add" ? "Added" : "Removed";
-      tr.querySelector(".src").textContent = r.firstBar ? "first bar" : "";
-      return tr;
-    }));
-  }
-  const shown = Math.min(visible.length, SHOW);
-  $("count").textContent = `${fmt(visible.length)} changes` + (shown < visible.length ? ` · showing ${fmt(shown)}` : "") + ` · logged since ${fmtDay(since)}`;
+  else body.replaceChildren(...visible.slice(0, SHOW).map(r => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td class="date"></td><td></td><td class="sym"></td><td><span class="badge ${r.kind}"></span></td>`;
+    tr.children[0].textContent = fmtDay(r.date);
+    tr.children[1].textContent = exName(r.ex);
+    tr.children[2].textContent = r.ticker;
+    tr.children[2].title = r.s;
+    tr.querySelector(".badge").textContent = r.kind === "add" ? "Added" : "Removed";
+    if (r.firstBar) tr.querySelector(".badge").title = "Backfilled from the first bar on TradingView";
+    return tr;
+  }));
+  $("count").textContent = visible.length > SHOW ? `${fmt(SHOW)} of ${fmt(visible.length)} changes` : `${fmt(visible.length)} changes`;
   $("copy").disabled = !visible.length;
+  markActive();
 }
 
 function copyText(text) {
@@ -180,18 +248,16 @@ $("copy").addEventListener("click", e => {
   copyText([...new Set(visible.map(r => r.s))].join(","));
   const b = e.currentTarget; b.classList.add("done"); clearTimeout(b._done); b._done = setTimeout(() => b.classList.remove("done"), 900);
 });
-
-for (const id of ["quotes", "kinds", "period", "ex"]) $(id).addEventListener("change", () => { save(); render(); });
-$("venues").addEventListener("change", () => { fillExchanges(); save(); render(); });
+for (const id of ["p-date", "p-sym", "p-chg"]) $(id).addEventListener("change", () => { save(); render(); });
 $("q").addEventListener("input", () => { save(); render(); });
 const topBar = document.querySelector(".top");
 new ResizeObserver(() => document.documentElement.style.setProperty("--head-h", `${topBar.offsetHeight}px`)).observe(topBar);
 
 (async () => {
-  const st = restore();
+  const picked = restore();
   try {
     const [log, venues] = await Promise.all(["data/log.json", "data/exchanges.json"].map(u => fetch(u, { cache: "no-store" }).then(r => { if (!r.ok) throw 0; return r.json(); })));
-    venueOf = venues; since = log.since;
+    venueOf = venues;
     for (const e of log.entries) for (const [kind, list] of [["add", e.added], ["del", e.removed]]) for (const s of list) {
       const [ex, ticker] = s.split(":");
       all.push({ date: e.date, ex, ticker, s, kind, firstBar: e.source === "first-bar", quote: ticker.includes("USDC") ? "USDC" : "USDT" });
@@ -201,7 +267,8 @@ new ResizeObserver(() => document.documentElement.style.setProperty("--head-h", 
     $("rows").innerHTML = `<tr><td class="empty" colspan="4">The log could not be loaded.</td></tr>`;
     return;
   }
-  fillExchanges(st.ex || "");
+  exchanges = [...new Set(all.map(r => r.ex))].sort((a, b) => (RANK[a] ?? Infinity) - (RANK[b] ?? Infinity) || exName(a).localeCompare(exName(b)));
+  buildExchanges(picked);
   render();
 })();
 </script>
