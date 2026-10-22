@@ -266,6 +266,8 @@ function buildTable() {
 }
 
 function refresh() {
+  // An exchange with nothing under the ticked quotes is hidden rather than shown as a row of dashes.
+  for (const tr of body.querySelectorAll("tr")) tr.hidden = ![...tr.querySelectorAll("td")].some(td => counts.get(td.dataset.key));
   for (const td of body.querySelectorAll("td")) {
     const n = counts.get(td.dataset.key) || 0, box = td.querySelector("input");
     td.classList.toggle("off", !n);

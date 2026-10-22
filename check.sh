@@ -16,12 +16,17 @@ const report = o => { const pre = document.createElement("pre"); pre.id = "check
     const shown = id => getComputedStyle(document.getElementById(id)).display !== "none";
     if (shown("settings") || shown("out")) return report({ errors: ["settings panel or output is visible on load"] });
   }
+  if (corner) {
+    // Default quote (USDT only): no visible exchange row may be empty.
+    const empty = [...document.querySelectorAll("#body tr:not([hidden])")].filter(tr => !tr.querySelector("td input:not([disabled])")).length;
+    if (empty) return report({ errors: [`${empty} visible exchange rows have no USDT symbols`] });
+  }
   if (corner) document.querySelectorAll("#quotes input").forEach(i => { if (!i.checked) i.click(); });
   if (!corner) { if (Date.now() - t0 < 30000) return setTimeout(waitTable, 200); return report({ errors: ["matrix did not load"] }); }
   const cells = document.querySelectorAll("#body td input:not([disabled])").length;
   corner.click();
   const checked = document.querySelectorAll("#body td input:checked").length;
-  const rows = document.querySelectorAll("#body tr").length;
+  const rows = document.querySelectorAll("#body tr:not([hidden])").length;
   document.getElementById("go").click();
   (function waitLists() {
     const out = document.getElementById("out"), go = document.getElementById("go");
