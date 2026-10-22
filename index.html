@@ -45,11 +45,13 @@ td:has(input:checked) .n { color: var(--fg); }
 td.off { color: var(--muted); font-family: var(--f-mono); font-size: 12px; }
 .bar { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px;
   background: var(--bg); border-top: 1px solid var(--line); padding-block: 10px max(10px, env(safe-area-inset-bottom, 0px)); }
-.sel { font-size: 13px; color: var(--muted); font-family: var(--f-mono); }
+.sel { min-width: 0; font-size: 13px; color: var(--muted); font-family: var(--f-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Settings: a panel that opens below the gear, right-aligned to it. */
 .pop { position: absolute; z-index: 5; right: 0; top: calc(100% + 6px); width: min(300px, calc(100vw - 24px)); display: grid; gap: 12px; padding: 12px 14px;
   background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 28px var(--shadow); }
 .pop hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
+.pop-col { display: grid; gap: 6px; font-size: 13px; }
+.pop { max-height: calc(100vh - var(--head-h, 60px) - 12px); overflow: auto; }
 .pop-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; }
 label.pop-row { cursor: pointer; }
 #out { display: grid; gap: 14px; padding-bottom: 24px; scroll-margin-top: 12px; }
@@ -108,14 +110,7 @@ table.dense td label.c, table.dense thead th:not(:first-child) label.c { flex-di
         <span class="lbl">Table</span>
       <label class="pop-row" for="split"><span>Split TradFi by ticker</span><input type="checkbox" id="split"></label>
       <label class="pop-row" for="fresh"><span>Hide stale (no price 7+ days)</span><input type="checkbox" id="fresh" checked></label>
-      <div class="pop-row"><span id="age-lbl">Listed</span>
-        <div class="seg" id="age" role="radiogroup" aria-labelledby="age-lbl">
-          <label><input type="radio" name="age" value="0" checked><span>All</span></label>
-          <label><input type="radio" name="age" value="1"><span>1d</span></label>
-          <label><input type="radio" name="age" value="7"><span>7d</span></label>
-          <label><input type="radio" name="age" value="30"><span>30d</span></label>
-        </div>
-      </div>
+      <div class="pop-col"><span id="age-lbl">Listed</span><div id="agepick" role="group" aria-labelledby="age-lbl"></div></div>
       <hr>
       <span class="lbl" id="settings-lbl">Generation</span>
         <div class="pop-row"><span id="mode-lbl">Lists</span>
@@ -170,9 +165,9 @@ const SUBS = TRADFI_SPLIT.map(([k]) => k);
 const splitOn = () => $("split").checked;
 const kinds = () => [...BASE_KINDS, ...(splitOn() ? TRADFI_SPLIT : TRADFI)];
 // TradingView has no subtype for TradFi, so the split classifies by the underlying, guessed from the ticker:
-//   Stocks      one company, including leveraged funds on a single stock (TSLL, NVDL, CONL);
+//   Stocks      one company, including leveraged funds on a single stock (TSLL, NVDL, CONL) and single-coin crypto funds (IBIT, BITO);
 //   Indices     index contracts (US500, SPX500, NAS100) and funds on a basket or an index: broad, sector,
-//               country, bond and volatility ETFs (SPY, QQQ, IWM, XLK, EWJ, TLT, UVXY), crypto funds (IBIT) too;
+//               country, bond and volatility ETFs (SPY, QQQ, IWM, XLK, EWJ, TLT, UVXY);
 //   Metals      metal contracts and metal funds (XAU, GOLD, GLD, SLV);
 //   Commodities energy, farm and freight contracts and funds (CL, NATGAS, USO, CORN, BWET), GPU compute (H100);
 //   FX          currency pairs.
@@ -183,7 +178,7 @@ const FUNDS = {
     "XLB XLE XLF XLI XLK XLP XLU XLV XLY SMH SOXX SOXL SOXS SOXQ KRE XBI IBB LABU IGV CIBR BOTZ AIQ ARKK ARKG IYF VFH " +
     "XME OIH XOP URA URNM REMX COPX GDX GDXJ SIL SILJ NUGT KWEB BUG DFEN SHLD DRAM RAM LYTE NCLD " +
     "EWH EWJ EWT EWY EWZ FXI INDA EEM EFA IEFA IEMG VGK VWO FLKR ARGT KODEX200 KORU KSTR " +
-    "TLT TBT TMF IEF LQD HYG AGG SGOV BIL USHY UVXY BVOL EVOL VOLX GVZ DXYZ IBIT BITO FBTC BITX ZCSH").split(" ")),
+    "TLT TBT TMF IEF LQD HYG AGG SGOV BIL USHY UVXY BVOL EVOL VOLX GVZ DXYZ").split(" ")),
   metal: new Set("GLD IAU SLV UGL AGQ".split(" ")),
   cmdty: new Set("USO UCO BOIL GSG BWET".split(" ")),
 };
@@ -228,13 +223,17 @@ let exchanges = [], venueOf = {};    // exchange order and "cex" / "dex" per exc
 
 const quotes = () => new Set([...$("quotes").querySelectorAll("input:checked")].map(i => i.value));
 const cellOf = r => key(r.ex, splitOn() ? r.sub : r.k);
-// "Listed": a symbol is new when its first bar on TradingView, about its listing date, falls within the period.
-const listedSince = () => { const d = +form("age"); return d ? Date.now() / 1000 - d * 86400 : 0; };
-const wanted = (r, qs, since = listedSince()) => qs.has(r.q) && !(r.stale && $("fresh").checked) && r.first >= since;
+// "Listed": a symbol is new when its first bar on TradingView, about its listing date, falls within the picked days.
+let agePick = null;
+function listedBounds() { // [from, to) in Unix seconds
+  const [f, t] = agePick ? agePick.range() : ["", ""];
+  return [f ? Date.parse(f + "T00:00:00Z") / 1000 : 0, t ? Date.parse(t + "T00:00:00Z") / 1000 + 86400 : Infinity];
+}
+const wanted = (r, qs, lb = listedBounds()) => qs.has(r.q) && !(r.stale && $("fresh").checked) && r.first >= lb[0] && r.first < lb[1];
 function recount() {
-  const qs = quotes(), since = listedSince();
+  const qs = quotes(), lb = listedBounds();
   counts = new Map();
-  for (const r of rows) if (wanted(r, qs, since)) counts.set(cellOf(r), (counts.get(cellOf(r)) || 0) + 1);
+  for (const r of rows) if (wanted(r, qs, lb)) counts.set(cellOf(r), (counts.get(cellOf(r)) || 0) + 1);
 }
 const venues = () => new Set([...$("venues").querySelectorAll("input:checked")].map(i => i.value));
 function indexExchanges() {
@@ -317,8 +316,8 @@ function refresh() {
   }
   const picked = [...selected].filter(c => enabled(...c.split("|")));
   const total = picked.reduce((s, c) => s + counts.get(c), 0);
-  const age = form("age");
-  $("sel").textContent = (picked.length ? `${fmt(total)} symbols` : "Nothing selected") + (age !== "0" ? ` · listed ≤ ${age}d` : "");
+  const listed = agePick ? agePick.label() : "";
+  $("sel").textContent = (picked.length ? `${fmt(total)} symbols` : "Nothing selected") + (listed ? ` · listed ${listed}` : "");
   go.disabled = !picked.length;
   out.hidden = true;
   last = null;
@@ -472,14 +471,17 @@ function setPop(open) {
   if (open) pop.querySelector("input:checked").focus();
 }
 gear.addEventListener("click", () => setPop(pop.hidden));
-document.addEventListener("click", e => { if (!pop.hidden && !pop.contains(e.target) && !gear.contains(e.target)) setPop(false); });
+// The event path is taken at click time: a calendar day re-renders (and leaves the DOM) while the click is handled.
+document.addEventListener("click", e => { const path = e.composedPath(); if (!pop.hidden && !path.includes(pop) && !path.includes(gear)) setPop(false); });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !pop.hidden) { setPop(false); gear.focus(); } });
 
 const STORE = "wb-settings", root = document.documentElement;
 function saveSettings() {
-  try { localStorage.setItem(STORE, JSON.stringify({ venues: [...venues()], quotes: [...quotes()], split: $("split").checked, fresh: $("fresh").checked, age: form("age"), mode: form("mode"), sections: $("sections").checked, theme: form("theme") })); }
+  try { localStorage.setItem(STORE, JSON.stringify({ venues: [...venues()], quotes: [...quotes()], split: $("split").checked, fresh: $("fresh").checked, listed: agePick.state(), mode: form("mode"), sections: $("sections").checked, theme: form("theme") })); }
   catch (_) {}
 }
+agePick = rangePicker($("agepick"), { name: "age", presets: [["0", "All"], ["1", "1d"], ["7", "7d"], ["30", "30d"]],
+  preset: "0", onChange: () => { saveSettings(); recount(); refresh(); } });
 function restoreSettings() {
   let st = {};
   try { st = JSON.parse(localStorage.getItem(STORE)) || {}; } catch (_) {}
@@ -489,7 +491,7 @@ function restoreSettings() {
   if (typeof st.sections === "boolean") $("sections").checked = st.sections;
   if (typeof st.split === "boolean") $("split").checked = st.split;
   if (typeof st.fresh === "boolean") $("fresh").checked = st.fresh;
-  if (["0", "1", "7", "30"].includes(st.age)) document.querySelector(`input[name=age][value="${st.age}"]`).checked = true;
+  agePick.set(st.listed || (st.age ? { preset: st.age } : null)); // st.age: the older presets-only setting
   document.querySelector(`input[name=theme][value=${root.dataset.theme || "auto"}]`).checked = true;
 }
 function settingsChanged() {
@@ -506,7 +508,7 @@ $("theme").addEventListener("change", () => {
 $("quotes").addEventListener("change", () => { saveSettings(); recount(); refresh(); });
 $("venues").addEventListener("change", () => { saveSettings(); refresh(); });
 $("fresh").addEventListener("change", () => { saveSettings(); recount(); refresh(); });
-$("age").addEventListener("change", () => { saveSettings(); recount(); refresh(); });
+
 // Switching the split keeps the choice: a ticked TradFi cell becomes all its sub-columns, and back.
 $("split").addEventListener("change", () => {
   const on = splitOn();
@@ -527,6 +529,8 @@ out.addEventListener("click", e => { const b = e.target.closest(".btn.ghost"); i
 (async () => {
   try { rows = await scan(); }
   catch (err) { $("loaderr").textContent = `${err.message}. Reload the page.`; $("loaderr").hidden = false; return; }
+  const firsts = rows.filter(r => r.first).map(r => isoDay(r.first * 1000)).sort();
+  agePick.bounds(firsts[0], isoDay(Date.now()), new Set(firsts));
   indexExchanges(); recount(); buildTable(); refresh();
 })();
 </script>

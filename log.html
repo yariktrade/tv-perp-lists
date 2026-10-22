@@ -47,27 +47,7 @@ td.empty { color: var(--muted); white-space: normal; padding: 18px 10px; }
   background: var(--surface); border: 1px solid var(--line); border-top: 0; border-radius: 0 8px 8px 8px; box-shadow: 0 12px 28px var(--shadow);
   text-transform: none; letter-spacing: normal; font-size: 13px; font-weight: 400; color: var(--fg); white-space: normal; }
 th:nth-child(n+3) .hpop { left: auto; right: 0; border-radius: 8px 0 8px 8px; }
-/* Date menu: preset chips over a month calendar; two clicks pick a range, presets show as a range too. */
 #p-date { width: min(292px, calc(100vw - 24px)); }
-.presets { display: grid; }
-.presets span { padding: 4px 0; }
-.cal { display: grid; gap: 6px; }
-.cal-head { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; }
-.cal-nav { width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--fg); font: inherit; font-size: 16px; line-height: 1; cursor: pointer; }
-.cal-nav:disabled { opacity: 0.35; cursor: default; }
-.cal-nav:not(:disabled):hover { border-color: var(--accent); color: var(--accent); }
-.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 2px; }
-.cal-grid .wd { text-align: center; font-size: 10.5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 2px 0 4px; }
-.cal-grid button { position: relative; height: 32px; border: 0; background: none; font: inherit; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--fg); cursor: pointer; }
-.cal-grid button:disabled { color: var(--muted); opacity: 0.4; cursor: default; }
-.cal-grid button.in { background: var(--accent-soft); }
-.cal-grid button.start, .cal-grid button.end { background: var(--accent); color: var(--accent-fg); }
-.cal-grid button.start { border-radius: 6px 0 0 6px; } .cal-grid button.end { border-radius: 0 6px 6px 0; } .cal-grid button.start.end { border-radius: 6px; }
-.cal-grid button.today:not(.start):not(.end) { box-shadow: inset 0 0 0 1px var(--accent); border-radius: 6px; }
-.cal-grid button.has::after { content: ""; position: absolute; left: 50%; bottom: 4px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: currentColor; opacity: 0.55; }
-.cal-grid button:not(:disabled):hover { box-shadow: inset 0 0 0 1px var(--accent); }
-.cal-grid button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.cal-foot { font-size: 12px; color: var(--muted); min-height: 16px; }
 .opt { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; }
 .opt span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .opt small { margin-left: auto; color: var(--muted); font-family: var(--f-mono); font-size: 11px; }
@@ -104,22 +84,7 @@ th:nth-child(n+3) .hpop { left: auto; right: 0; border-radius: 8px 0 8px 8px; }
         <th>
           <button type="button" class="hbtn" data-pop="p-date" aria-expanded="false"><span>Date</span>CHEVRON</button>
           <div class="hpop" id="p-date" hidden>
-            <div class="seg presets" role="radiogroup" aria-label="Period">
-              <label><input type="radio" name="period" value="7"><span>7d</span></label>
-              <label><input type="radio" name="period" value="30" checked><span>30d</span></label>
-              <label><input type="radio" name="period" value="90"><span>90d</span></label>
-              <label><input type="radio" name="period" value="0"><span>All</span></label>
-              <input type="radio" name="period" value="custom" hidden aria-label="Custom range">
-            </div>
-            <div class="cal" id="cal">
-              <div class="cal-head">
-                <button type="button" class="cal-nav" id="prev" aria-label="Previous month">‹</button>
-                <span id="month"></span>
-                <button type="button" class="cal-nav" id="next" aria-label="Next month">›</button>
-              </div>
-              <div class="cal-grid" id="days" role="grid"></div>
-              <div class="cal-foot" id="picked"></div>
-            </div>
+            <div id="datepick"></div>
           </div>
         </th>
         <th>
@@ -160,56 +125,9 @@ for (const b of document.querySelectorAll(".hbtn")) b.innerHTML = b.innerHTML.re
 const $ = id => document.getElementById(id);
 const fmt = n => n.toLocaleString("en-US");
 const values = (name, all) => [...document.querySelectorAll(`input[name=${name}]${all ? "" : ":checked"}`)].map(i => i.value);
-const period = () => values("period")[0]; // "7" | "30" | "90" | "0" (all time) | "custom"
-// The date window as inclusive YYYY-MM-DD bounds; an empty bound is open.
-let pickFrom = "", pickTo = "";   // a custom range picked on the calendar; pickTo is empty after the first click
-const iso = t => new Date(t).toISOString().slice(0, 10);
-function dateRange() {
-  const p = period();
-  if (p === "custom") return [pickFrom, pickTo || pickFrom];
-  return [+p ? iso(Date.now() - +p * 86400000) : "", ""];
-}
-
-// Month calendar, Monday first. Days outside the logged span are disabled; days with changes carry a dot.
-let calMonth = "", minDay = "", maxDay = "", busyDays = new Set();
-const monthOf = d => d.slice(0, 7);
-const shiftMonth = (m, n) => { const [y, mo] = m.split("-").map(Number); const d = new Date(Date.UTC(y, mo - 1 + n, 1)); return d.toISOString().slice(0, 7); };
-function drawCalendar() {
-  const [from, to] = dateRange(), end = to || maxDay;
-  const [y, m] = calMonth.split("-").map(Number);
-  $("month").textContent = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
-  $("prev").disabled = calMonth <= monthOf(minDay);
-  $("next").disabled = calMonth >= monthOf(maxDay);
-  const cells = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map(w => Object.assign(document.createElement("span"), { className: "wd", textContent: w }));
-  const lead = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7, days = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  for (let i = 0; i < lead; i++) cells.push(document.createElement("span"));
-  for (let d = 1; d <= days; d++) {
-    const day = `${calMonth}-${String(d).padStart(2, "0")}`, b = document.createElement("button");
-    b.type = "button"; b.textContent = d; b.dataset.date = day;
-    b.disabled = day < minDay || day > maxDay;
-    const inRange = from ? day >= from && day <= end : day <= end;
-    b.classList.toggle("in", inRange && !b.disabled);
-    b.classList.toggle("start", !!from && day === from);
-    b.classList.toggle("end", day === end && (!!from || period() === "0"));
-    b.classList.toggle("today", day === maxDay);
-    b.classList.toggle("has", busyDays.has(day));
-    cells.push(b);
-  }
-  $("days").replaceChildren(...cells);
-  $("picked").textContent = period() === "custom" && !pickTo ? `${fmtDay(pickFrom)} · pick the end date` : (from ? `${fmtDay(from)} – ${fmtDay(end)}` : `All time to ${fmtDay(end)}`);
-}
-$("days").addEventListener("click", e => {
-  const day = e.target.dataset?.date;
-  if (!day || e.target.disabled) return;
-  if (period() !== "custom" || pickTo) { pickFrom = day; pickTo = ""; }       // first click starts a range
-  else if (day < pickFrom) { pickTo = pickFrom; pickFrom = day; }            // second click ends it, either direction
-  else pickTo = day;
-  document.querySelector('input[name=period][value="custom"]').checked = true;
-  save(); render(); drawCalendar();
-});
-$("prev").addEventListener("click", () => { calMonth = shiftMonth(calMonth, -1); drawCalendar(); });
-$("next").addEventListener("click", () => { calMonth = shiftMonth(calMonth, 1); drawCalendar(); });
-const fmtDay = d => new Date(d + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+const datePick = rangePicker($("datepick"), { name: "period", presets: [["7", "7d"], ["30", "30d"], ["90", "90d"], ["0", "All"]],
+  preset: "30", onChange: () => { save(); render(); } });
+const dateRange = () => datePick.range(); // inclusive YYYY-MM-DD bounds; "" is open
 let all = [], venueOf = {}, visible = [], exchanges = [];
 const venue = ex => venueOf[ex] || "cex";
 
@@ -275,17 +193,14 @@ $("exfind").addEventListener("input", e => {
 // ---- filter state
 function save() {
   const exAll = values("ex", true), exOn = values("ex");
-  try { localStorage.setItem(STORE, JSON.stringify({ period: period(), from: pickFrom, to: pickTo, exOn, exOff: exAll.filter(ex => !exOn.includes(ex)),
+  try { localStorage.setItem(STORE, JSON.stringify({ date: datePick.state(), exOn, exOff: exAll.filter(ex => !exOn.includes(ex)),
     quotes: values("quote"), kinds: values("kind"), q: $("q").value })); }
   catch (_) {}
 }
 function restore() {
   let st = {};
   try { st = JSON.parse(localStorage.getItem(STORE)) || {}; } catch (_) {}
-  if (["7", "30", "90", "0", "custom"].includes(st.period)) document.querySelector(`input[name=period][value="${st.period}"]`).checked = true;
-  if (typeof st.from === "string") pickFrom = st.from;
-  if (typeof st.to === "string") pickTo = st.to;
-  if (period() === "custom" && !pickFrom) document.querySelector('input[name=period][value="30"]').checked = true;
+  datePick.set(st.date);
   for (const name of ["quote", "kind"]) if (Array.isArray(st[name + "s"])) for (const i of document.querySelectorAll(`input[name=${name}]`)) i.checked = st[name + "s"].includes(i.value);
   if (typeof st.q === "string") $("q").value = st.q;
   return { on: Array.isArray(st.exOn) ? st.exOn : [], off: Array.isArray(st.exOff) ? st.exOff : [] };
@@ -317,7 +232,7 @@ function render() {
   markActive();
 }
 
-for (const id of ["p-date", "p-sym", "p-chg"]) $(id).addEventListener("change", () => { save(); render(); if (id === "p-date") drawCalendar(); });
+for (const id of ["p-sym", "p-chg"]) $(id).addEventListener("change", () => { save(); render(); });
 $("q").addEventListener("input", () => { save(); render(); });
 const topBar = document.querySelector(".top");
 new ResizeObserver(() => document.documentElement.style.setProperty("--head-h", `${topBar.offsetHeight}px`)).observe(topBar);
@@ -337,9 +252,7 @@ new ResizeObserver(() => document.documentElement.style.setProperty("--head-h", 
     return;
   }
   const dates = all.map(r => r.date).sort();
-  minDay = dates[0] || iso(Date.now()); maxDay = iso(Date.now()); busyDays = new Set(dates);
-  calMonth = monthOf(period() === "custom" ? (pickTo || pickFrom) : maxDay);
-  drawCalendar();
+  datePick.bounds(dates[0], isoDay(Date.now()), new Set(dates));
   exchanges = [...new Set(all.map(r => r.ex))].sort((a, b) => (RANK[a] ?? Infinity) - (RANK[b] ?? Infinity) || exName(a).localeCompare(exName(b)));
   buildExchanges(picked);
   render();

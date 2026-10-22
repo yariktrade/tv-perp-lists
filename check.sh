@@ -44,6 +44,15 @@ const report = o => { const pre = document.createElement("pre"); pre.id = "check
     document.querySelector('input[name=age][value="0"]').click();
     if (!(recent > 0 && recent < withFilter) || total() !== withFilter) return report({ errors: [`listed 30d: ${recent} of ${withFilter}`] });
     listed30 = recent;
+    // Listed calendar: two clicks pick Oct 15-20, 2026; that is a part of All, and switching back restores All.
+    const lday = d => document.querySelector(`#agepick .cal-grid button[data-date="${d}"]`);
+    for (let i = 0; i < 36 && !lday("2026-10-15"); i++) document.querySelector('#agepick [data-step="-1"]').click();
+    document.getElementById("gear").click();
+    lday("2026-10-15").click(); lday("2026-10-20").click(); const picked = total();
+    if (document.getElementById("settings").hidden) return report({ errors: ["the settings panel closed on a calendar click"] });
+    document.getElementById("gear").click();
+    document.querySelector('input[name=age][value="0"]').click();
+    if (!(picked > 0 && picked < withFilter) || total() !== withFilter) return report({ errors: [`listed Oct 15-20: ${picked} of ${withFilter}`] });
   }
   if (corner) document.querySelectorAll("#quotes input, #venues input").forEach(i => { if (!i.checked) i.click(); });
   if (!corner) { if (Date.now() - t0 < 30000) return setTimeout(waitTable, 200); return report({ errors: ["matrix did not load"] }); }
@@ -111,8 +120,8 @@ probe = open(f"{tmp}/log.html").read() + """<script>
     const pre = document.createElement("pre"); pre.id = "check-result";
     const first = document.getElementById("count").textContent;
     // calendar: click Oct 15 and Oct 20, 2026 (walking back months if needed)
-    const day = d => document.querySelector(`#days button[data-date="${d}"]`);
-    for (let i = 0; i < 36 && !day("2026-10-15"); i++) document.getElementById("prev").click();
+    const day = d => document.querySelector(`#p-date .cal-grid button[data-date="${d}"]`);
+    for (let i = 0; i < 36 && !day("2026-10-15"); i++) document.querySelector('#p-date [data-step="-1"]').click();
     document.querySelector(".hbtn[data-pop=p-date]").click();
     day("2026-10-15").click(); day("2026-10-20").click();
     if (document.getElementById("p-date").hidden) { const pre = document.createElement("pre"); pre.id = "check-result";
