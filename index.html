@@ -31,7 +31,7 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; } /* components below set display; hidden must still win */
 body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 14px; line-height: 1.4; }
-.wrap { max-width: 640px; margin: 0 auto;
+.wrap { max-width: 720px; margin: 0 auto;
   padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px));
   display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 input[type=checkbox], input[type=radio] { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; flex: none; }
@@ -78,7 +78,6 @@ td.off { color: var(--muted); font-family: var(--f-mono); font-size: 12px; }
   border-radius: 50%; background: var(--surface); color: var(--muted); cursor: pointer; }
 .icon:hover, .icon[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 .icon svg { width: 16px; height: 16px; }
-.dot { position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg); }
 /* Settings: a panel that opens below the gear, right-aligned to it. */
 .pop { position: absolute; z-index: 5; right: 0; top: calc(100% + 6px); width: min(300px, calc(100vw - 24px)); display: grid; gap: 12px; padding: 12px 14px;
   background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 28px var(--shadow); }
@@ -116,7 +115,13 @@ textarea { width: 100%; height: 64px; resize: vertical; font-family: var(--f-mon
   padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); }
 .note { font-size: 12.5px; color: var(--muted); margin: 0; }
 .note.error { color: var(--error); }
+table.dense td label.c, table.dense thead th:not(:first-child) label.c { flex-direction: column; justify-content: center; gap: 3px; min-height: 44px; padding-left: 2px; padding-right: 2px; }
 @media (max-width: 600px) {
+  table.dense thead th { vertical-align: top; } /* checkboxes on one line, labels hang below */
+  table.dense thead th:not(:first-child) label.c { justify-content: flex-start; }
+  table.dense thead th:first-child label.c { align-items: flex-start; }
+  table.dense thead th:not(:first-child) label.c span { writing-mode: vertical-rl; transform: rotate(180deg); max-height: 64px; }
+  table.dense td .n { font-size: 10px; letter-spacing: -0.02em; }
   label.c { padding: 6px 4px; gap: 6px; }
   tbody th label.c, thead th:first-child label.c { padding-left: 8px; }
   td label.c, thead th:not(:first-child) label.c { flex-direction: column; justify-content: center; gap: 3px; min-height: 44px; padding-left: 4px; }
@@ -149,10 +154,12 @@ textarea { width: 100%; height: 64px; resize: vertical; font-family: var(--f-mon
     <div class="gearwrap">
       <button type="button" class="icon" id="gear" aria-label="Settings" aria-expanded="false" aria-controls="settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-        <span class="dot" hidden></span>
       </button>
       <div class="pop" id="settings" role="group" aria-label="Settings" hidden>
-        <span class="lbl" id="settings-lbl">Generation</span>
+        <span class="lbl">Table</span>
+      <label class="pop-row" for="split"><span>Split TradFi by ticker</span><input type="checkbox" id="split"></label>
+      <hr>
+      <span class="lbl" id="settings-lbl">Generation</span>
         <div class="pop-row"><span id="mode-lbl">Lists</span>
           <div class="seg" id="mode" role="radiogroup" aria-labelledby="mode-lbl">
             <label><input type="radio" name="mode" value="together" checked><span>Together</span></label>
@@ -206,8 +213,28 @@ const KNOWN = [ // display names; these CEXes lead in this order, every other ex
   ["BITRUE", "Bitrue"], ["BITSTAMP", "Bitstamp"], ["COINJAR", "CoinJar"], ["BITAZZA", "Bitazza"], ["BITSO", "Bitso"],
   ["BITFLYER", "bitFlyer"],
 ];
-const KINDS = [["spot", "Spot"], ["perp", "Perps"], ["fut", "Futures"], ["tradfi", "TradFi"]];
-const KIND_FILE = { spot: "spot", perp: "perps", fut: "futures", tradfi: "tradfi" };
+const BASE_KINDS = [["spot", "Spot"], ["perp", "Perps"], ["fut", "Futures"]];
+const TRADFI = [["tradfi", "TradFi"]];
+const TRADFI_SPLIT = [["stock", "Stocks"], ["index", "Indices"], ["metal", "Metals"], ["cmdty", "Commod."], ["fx", "FX"]];
+const KIND_FULL = { spot: "Spot", perp: "Perps", fut: "Futures", tradfi: "TradFi", stock: "Stocks & ETF", index: "Indices", metal: "Metals", cmdty: "Commodities", fx: "FX" };
+const KIND_FILE = { spot: "spot", perp: "perps", fut: "futures", tradfi: "tradfi", stock: "stocks", index: "indices", metal: "metals", cmdty: "commodities", fx: "fx" };
+const SUBS = TRADFI_SPLIT.map(([k]) => k);
+const splitOn = () => $("split").checked;
+const kinds = () => [...BASE_KINDS, ...(splitOn() ? TRADFI_SPLIT : TRADFI)];
+// TradingView has no subtype for TradFi, so the split guesses it from the ticker: FX pairs, metals,
+// energy and farm goods, and indices are short known lists; everything else counts as stocks and ETFs.
+// On 2026-10-22 it agreed with the exchanges' own classes for 1167 of 1170 symbols (misses: IAU, SLV, H100).
+const CCY = "USD|EUR|GBP|JPY|CHF|AUD|NZD|CAD|SGD|HKD|CNH|CNY|SEK|NOK|DKK|PLN|TRY|ZAR|MXN|BRL|ARS|INR|IDR|KRW|TWD|THB|ILS|RUB|HUF|CZK";
+const TF_RULES = [
+  ["fx", new RegExp(`^(${CCY})(${CCY})$`)],
+  ["metal", /^(X(AU|AG|PT|PD)[A-Z]*|XCU|XAL|XNI|XPB\d*|XZN|GOLD(XAU|CIR)?|SILVER(XAG)?|PLATINUM(XPT)?|PALLADIUM(XPD)?|COPPER|ALUMIN(I)?UM(XAL)?|NICKEL(XNI)?|ZINC(XZN)?|LEAD(XPB)?)$/],
+  ["cmdty", /^(CL|BZ|NG|NGAS|NATGAS|NATURALGAS(NG)?|USOIL|UKOIL(UST\.P)?|WTIOIL|OILWTI|BRENTOIL|OILBRENT|XTI|XBR|HEATINGOIL|CORN|WHEAT|SOYBEAN|COFFEE|SUGAR|COCOA|COTTON)$/],
+  ["index", /^(US30|US100|US500|US2000(USD)?|NAS100|NASDAQ100|NDX100|SP500|SPX500|DJ30|DOWJONES|GER40|DE30EUR|DE40|UK100(GBP)?|FR40(EUR)?|EU50(EUR)?|JP225(USD)?|JPN225|NIKKEI225|HK50(\.P)?|HK33HKD|HSCHKD|AU200AUD|AUS200|KOSPI|KR200|NIFTY50|NIFTYBANK|RUSSELL2000|TECH100|VIX|USDOLLARINDEXDXY|DXY|COIN50|BTCDVOL|[A-Z0-9]+IXUST\.P|[BE]VIVUST\.P)$/],
+];
+function tradfiSub(symbol) {
+  const root = symbol.split(":")[1].replace(/(USDT|USDC)(\.P|\d{2}[A-Z]\d{4})?$/, "");
+  return (TF_RULES.find(([, re]) => re.test(root)) || ["stock"])[0];
+}
 const NAME = Object.fromEntries(KNOWN), RANK = Object.fromEntries(KNOWN.map(([id], i) => [id, i]));
 // DEX ids glue protocol, version and chain together (PANCAKESWAP3BSC); split them for display.
 // Unknown parts fall back to the raw id, so a new DEX still shows up, just less prettily.
@@ -248,7 +275,7 @@ async function scan(exchanges) { // all exchanges when none are given
   catch (_) { throw new Error("TradingView did not respond"); }
   if (!r.ok) throw new Error(`TradingView: HTTP ${r.status}`);
   const j = await r.json();
-  return j.data.map(x => ({ s: x.s, ex: x.d[0], k: kindOf(x.d[1], x.d[3]), q: x.d[2], v: x.d[4] }));
+  return j.data.map(x => { const k = kindOf(x.d[1], x.d[3]); return { s: x.s, ex: x.d[0], k, sub: k === "tradfi" ? tradfiSub(x.s) : k, q: x.d[2], v: x.d[4] }; });
 }
 
 const $ = id => document.getElementById(id);
@@ -258,10 +285,11 @@ let rows = [], counts = new Map(); // counts: key -> symbols in that cell under 
 let exchanges = [], venueOf = {};    // exchange order and "cex" / "dex" per exchange, from the load response
 
 const quotes = () => new Set([...$("quotes").querySelectorAll("input:checked")].map(i => i.value));
+const cellOf = r => key(r.ex, splitOn() ? r.sub : r.k);
 function recount() {
   const qs = quotes();
   counts = new Map();
-  for (const r of rows) if (qs.has(r.q)) counts.set(key(r.ex, r.k), (counts.get(key(r.ex, r.k)) || 0) + 1);
+  for (const r of rows) if (qs.has(r.q)) counts.set(cellOf(r), (counts.get(cellOf(r)) || 0) + 1);
 }
 const venues = () => new Set([...$("venues").querySelectorAll("input:checked")].map(i => i.value));
 function indexExchanges() {
@@ -290,17 +318,17 @@ function headerBox(label, aria, cells) {
 
 function buildTable() {
   const exs = exchanges;
-  head.replaceChildren(headerBox("All", "Select the whole table", () => exs.flatMap(ex => KINDS.map(([k]) => [ex, k]))));
-  for (const [k, label] of KINDS) head.append(headerBox(label, `Select column ${label}`, () => exs.map(ex => [ex, k])));
+  head.replaceChildren(headerBox("All", "Select the whole table", () => exs.flatMap(ex => kinds().map(([k]) => [ex, k]))));
+  for (const [k, label] of kinds()) head.append(headerBox(label, `Select column ${label}`, () => exs.map(ex => [ex, k])));
   body.replaceChildren();
   for (const ex of exs) {
     const tr = document.createElement("tr");
     const { title, sub } = exParts(ex);
-    const th = headerBox(title, `Select row ${exName(ex)}`, () => KINDS.map(([k]) => [ex, k]));
+    const th = headerBox(title, `Select row ${exName(ex)}`, () => kinds().map(([k]) => [ex, k]));
     if (sub) th.querySelector("span").append(Object.assign(document.createElement("small"), { textContent: sub }));
     th.setAttribute("scope", "row");
     tr.append(th);
-    for (const [k, label] of KINDS) {
+    for (const [k, label] of kinds()) {
       const td = document.createElement("td");
       td.dataset.key = key(ex, k);
       td.innerHTML = `<label class="c"><input type="checkbox"> <span class="n"></span></label>`;
@@ -322,10 +350,12 @@ function refresh() {
   // An exchange of an unticked venue, or with nothing under the ticked quotes, is hidden rather than shown as a row of dashes;
   // so is a market column that no visible exchange has (a DEX-only view keeps just Spot).
   for (const tr of body.querySelectorAll("tr")) tr.hidden = ![...tr.querySelectorAll("td")].some(td => enabled(...td.dataset.key.split("|")));
-  const shown = KINDS.map(([k]) => exchanges.some(ex => enabled(ex, k)));
+  const shown = kinds().map(([k]) => exchanges.some(ex => enabled(ex, k)));
   for (const tr of [head, ...body.querySelectorAll("tr")]) shown.forEach((on, i) => { tr.children[i + 1].hidden = !on; });
   const n = shown.filter(Boolean).length;
-  $("cols").innerHTML = `<col style="width:${100 - n * 17.25}%">` + "<col>".repeat(n);
+  const per = Math.min(17.25, 76 / Math.max(n, 1)); // up to four market columns at 17.25%; more share 76%
+  $("cols").innerHTML = `<col style="width:${100 - n * per}%">` + "<col>".repeat(n);
+  document.querySelector(".matrix table").classList.toggle("dense", n > 4);
   for (const td of body.querySelectorAll("td")) {
     const n = enabled(...td.dataset.key.split("|")) ? counts.get(td.dataset.key) : 0, box = td.querySelector("input");
     td.classList.toggle("off", !n);
@@ -418,8 +448,8 @@ async function run() {
   try {
     const fresh = await scan(exs);
     const byCell = new Map(cells.map(c => [c, []]));
-    for (const r of fresh) if (qs.has(r.q)) { const c = byCell.get(key(r.ex, r.k)); if (c) c.push(r.s); }
-    const order = exchanges.flatMap(ex => KINDS.map(([k]) => key(ex, k))).filter(c => byCell.has(c) && byCell.get(c).length);
+    for (const r of fresh) if (qs.has(r.q)) { const c = byCell.get(cellOf(r)); if (c) c.push(r.s); }
+    const order = exchanges.flatMap(ex => kinds().map(([k]) => key(ex, k))).filter(c => byCell.has(c) && byCell.get(c).length);
     for (const c of order) byCell.get(c).sort();
     last = { order, byCell };
     render();
@@ -432,8 +462,8 @@ async function run() {
   out.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
 }
 
-const cellName = c => { const [ex, k] = c.split("|"); return `${exName(ex).replace(/ · /g, " ")} ${KINDS.find(x => x[0] === k)[1]}`; };
-const cellLabel = c => { const [ex, k] = c.split("|"); return `${exName(ex)} · ${KINDS.find(x => x[0] === k)[1]}`; };
+const cellName = c => { const [ex, k] = c.split("|"); return `${exName(ex).replace(/ · /g, " ")} ${KIND_FULL[k]}`; };
+const cellLabel = c => { const [ex, k] = c.split("|"); return `${exName(ex)} · ${KIND_FULL[k]}`; };
 const cellSlug = c => { const [ex, k] = c.split("|"); return `${ex.toLowerCase()}-${KIND_FILE[k]}`; };
 
 // Fill lists of at most TV_LIMIT entries; with sections on, each "###Name" header takes a slot too.
@@ -500,7 +530,7 @@ document.addEventListener("click", e => { if (!pop.hidden && !pop.contains(e.tar
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !pop.hidden) { setPop(false); gear.focus(); } });
 const STORE = "wb-settings", root = document.documentElement;
 function saveSettings() {
-  try { localStorage.setItem(STORE, JSON.stringify({ venues: [...venues()], quotes: [...quotes()], mode: form("mode"), sections: $("sections").checked, theme: form("theme") })); }
+  try { localStorage.setItem(STORE, JSON.stringify({ venues: [...venues()], quotes: [...quotes()], split: $("split").checked, mode: form("mode"), sections: $("sections").checked, theme: form("theme") })); }
   catch (_) {}
 }
 function restoreSettings() {
@@ -510,12 +540,11 @@ function restoreSettings() {
   if (Array.isArray(st.quotes)) for (const i of $("quotes").querySelectorAll("input")) i.checked = st.quotes.includes(i.value);
   if (st.mode === "together" || st.mode === "separate") document.querySelector(`input[name=mode][value=${st.mode}]`).checked = true;
   if (typeof st.sections === "boolean") $("sections").checked = st.sections;
+  if (typeof st.split === "boolean") $("split").checked = st.split;
   document.querySelector(`input[name=theme][value=${root.dataset.theme || "auto"}]`).checked = true;
-  markDefaults();
 }
-const markDefaults = () => { gear.querySelector(".dot").hidden = form("mode") === "together" && $("sections").checked; };
 function settingsChanged() {
-  markDefaults(); saveSettings();
+  saveSettings();
   if (last && !out.hidden) render();
 }
 $("mode").addEventListener("change", settingsChanged);
@@ -527,6 +556,17 @@ $("theme").addEventListener("change", () => {
 });
 $("quotes").addEventListener("change", () => { saveSettings(); recount(); refresh(); });
 $("venues").addEventListener("change", () => { saveSettings(); refresh(); });
+// Switching the split keeps the choice: a ticked TradFi cell becomes all its sub-columns, and back.
+$("split").addEventListener("change", () => {
+  const on = splitOn();
+  for (const c of [...selected]) {
+    const [ex, k] = c.split("|");
+    if (on && k === "tradfi") { selected.delete(c); for (const sk of SUBS) selected.add(key(ex, sk)); }
+    if (!on && SUBS.includes(k)) { selected.delete(c); selected.add(key(ex, "tradfi")); }
+  }
+  saveSettings();
+  if (rows.length) { recount(); buildTable(); refresh(); }
+});
 restoreSettings();
 go.addEventListener("click", run);
 const topBar = document.querySelector(".top");

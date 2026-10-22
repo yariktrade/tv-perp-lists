@@ -22,10 +22,22 @@ const report = o => { const pre = document.createElement("pre"); pre.id = "check
     if (empty) return report({ errors: [`${empty} visible exchange rows have no USDT symbols`] });
   }
   const cexRows = document.querySelectorAll("#body tr:not([hidden])").length;
+  if (corner) {
+    // Split TradFi: the sub-columns of every exchange must add up to its TradFi cell, and nothing else may move.
+    const numbers = () => Object.fromEntries([...document.querySelectorAll("#body tr:not([hidden])")].map(tr =>
+      [tr.querySelector("th").textContent.trim(), [...tr.querySelectorAll("td:not([hidden]) .n")].map(n => +n.textContent || 0)]));
+    const before = numbers();
+    document.getElementById("split").click();
+    const after = numbers(), cols = document.querySelectorAll("#head th:not([hidden])").length;
+    document.getElementById("split").click();
+    const bad = Object.keys(before).filter(ex => { const b = before[ex], a = after[ex] || [];
+      return b.slice(0, -1).join() !== a.slice(0, b.length - 1).join() || b.at(-1) !== a.slice(b.length - 1).reduce((x, y) => x + y, 0); });
+    if (cols < 7 || bad.length) return report({ errors: [`split TradFi: ${cols} visible columns, mismatched rows: ${bad.slice(0, 5).join(", ")}`] });
+  }
   if (corner) document.querySelectorAll("#quotes input, #venues input").forEach(i => { if (!i.checked) i.click(); });
   if (!corner) { if (Date.now() - t0 < 30000) return setTimeout(waitTable, 200); return report({ errors: ["matrix did not load"] }); }
   const cells = document.querySelectorAll("#body td input:not([disabled])").length;
-  corner.click();
+  document.querySelector("#head input").click(); // re-query: the split toggle rebuilt the table
   const checked = document.querySelectorAll("#body td input:checked").length;
   const rows = document.querySelectorAll("#body tr:not([hidden])").length;
   document.getElementById("go").click();
