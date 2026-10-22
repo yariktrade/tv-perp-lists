@@ -12,22 +12,23 @@
 /* Layout: one column; quote chips, exchange × market matrix, sticky action bar, generated lists. */
 :root {
   --bg: #F3F5F7; --surface: #FFFFFF; --fg: #131A20; --muted: #5A6570; --line: #D6DCE2; --row: #F7F9FA;
-  --accent: #0A6B75; --accent-soft: #DDEFF0; --accent-fg: #FFFFFF; --error: #B42318;
+  --accent: #0A6B75; --accent-soft: #DDEFF0; --accent-fg: #FFFFFF; --error: #B42318; --shadow: rgba(16, 24, 32, 0.14);
   --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) { :root {
   --bg: #0E1317; --surface: #151C21; --fg: #E4E9ED; --muted: #8C98A3; --line: #2A3540; --row: #182026;
-  --accent: #4DBFC9; --accent-soft: #12333A; --accent-fg: #062126; --error: #F97066; color-scheme: dark } }
+  --accent: #4DBFC9; --accent-soft: #12333A; --accent-fg: #062126; --error: #F97066; --shadow: rgba(0, 0, 0, 0.55); color-scheme: dark } }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 14px; line-height: 1.4; }
 .wrap { max-width: 640px; margin: 0 auto; padding-top: max(16px, env(safe-area-inset-top, 0px));
   padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px));
   display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 input[type=checkbox], input[type=radio] { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; flex: none; }
-.opts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.opts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .grp { display: flex; flex-wrap: wrap; gap: 6px; }
+.lbl { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px;
   background: var(--surface); cursor: pointer; user-select: none; font-size: 13px; font-weight: 500; }
 .chip:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
@@ -52,13 +53,30 @@ td.off { color: var(--muted); font-family: var(--f-mono); font-size: 12px; }
 .bar { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px;
   background: var(--bg); border-top: 1px solid var(--line); padding-block: 10px max(10px, env(safe-area-inset-bottom, 0px)); }
 .sel { font-size: 13px; color: var(--muted); font-family: var(--f-mono); }
+.bar .acts { display: flex; gap: 8px; align-items: center; }
+.icon { position: relative; width: 38px; height: 38px; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--surface); color: var(--muted); cursor: pointer; }
+.icon:hover, .icon[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+.icon svg { width: 18px; height: 18px; }
+.dot { position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+/* Generation settings: a panel that opens above the sticky bar, right-aligned to the gear. */
+.pop { position: absolute; right: 0; bottom: calc(100% + 6px); width: min(300px, 100%); display: grid; gap: 12px; padding: 12px 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 28px var(--shadow); }
+.pop-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; }
+label.pop-row { cursor: pointer; }
+.seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 2px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); }
+.seg label { position: relative; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.seg span { display: block; padding: 5px 12px; border-radius: 5px; text-align: center; font-size: 13px; font-weight: 500; color: var(--muted); }
+.seg input:checked + span { background: var(--accent); color: var(--accent-fg); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
 .btn { font: inherit; font-weight: 500; border-radius: 6px; cursor: pointer; border: 1px solid var(--accent); text-decoration: none;
   display: inline-block; white-space: nowrap; }
-.btn.primary { background: var(--accent); color: var(--accent-fg); padding: 8px 18px; }
+.btn.primary { background: var(--accent); color: var(--accent-fg); height: 38px; padding: 0 18px; }
 .btn.primary:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn.ghost { background: transparent; color: var(--accent); padding: 4px 10px; font-size: 13px; }
 .btn.ghost:hover { background: var(--accent-soft); }
-.btn:focus-visible, label:has(input:focus-visible), textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.btn:focus-visible, .icon:focus-visible, .chip:has(input:focus-visible), label.c:has(input:focus-visible), textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 #out { display: grid; gap: 14px; padding-bottom: 24px; scroll-margin-top: 12px; }
 .list { display: grid; gap: 6px; }
 .list-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
@@ -83,15 +101,11 @@ textarea { width: 100%; height: 64px; resize: vertical; font-family: var(--f-mon
 <body>
 <main class="wrap">
   <div class="opts">
-    <div class="grp" id="quotes" role="group" aria-label="Quote currency">
+    <span class="lbl" id="quote-lbl">Quote</span>
+    <div class="grp" id="quotes" role="group" aria-labelledby="quote-lbl">
       <label class="chip"><input type="checkbox" value="USDT" checked> USDT</label>
       <label class="chip"><input type="checkbox" value="USDC"> USDC</label>
     </div>
-    <div class="grp" id="mode" role="radiogroup" aria-label="Lists">
-      <label class="chip"><input type="radio" name="mode" value="together" checked> Together</label>
-      <label class="chip"><input type="radio" name="mode" value="separate"> Separate</label>
-    </div>
-    <label class="chip"><input type="checkbox" id="sections" checked> Sections in file</label>
   </div>
   <div class="matrix">
     <table>
@@ -103,7 +117,23 @@ textarea { width: 100%; height: 64px; resize: vertical; font-family: var(--f-mon
   <p class="note error" id="loaderr" hidden></p>
   <div class="bar">
     <span class="sel" id="sel">Nothing selected</span>
-    <button type="button" class="btn primary" id="go" disabled>Generate</button>
+    <div class="acts">
+      <button type="button" class="icon" id="gear" aria-label="Generation settings" aria-expanded="false" aria-controls="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span class="dot" hidden></span>
+      </button>
+      <button type="button" class="btn primary" id="go" disabled>Generate</button>
+    </div>
+    <div class="pop" id="settings" role="group" aria-labelledby="settings-lbl" hidden>
+      <span class="lbl" id="settings-lbl">Generation</span>
+      <div class="pop-row"><span id="mode-lbl">Lists</span>
+        <div class="seg" id="mode" role="radiogroup" aria-labelledby="mode-lbl">
+          <label><input type="radio" name="mode" value="together" checked><span>Together</span></label>
+          <label><input type="radio" name="mode" value="separate"><span>Separate</span></label>
+        </div>
+      </div>
+      <label class="pop-row" for="sections"><span>Sections in .txt</span><input type="checkbox" id="sections" checked></label>
+    </div>
   </div>
   <section id="out" hidden aria-live="polite"></section>
 </main>
@@ -356,8 +386,21 @@ function render() {
 }
 
 const form = name => document.querySelector(`input[name=${name}]:checked`).value;
-$("mode").addEventListener("change", () => { if (last && !out.hidden) render(); });
-$("sections").addEventListener("change", () => { if (last && !out.hidden) render(); });
+const gear = $("gear"), pop = $("settings");
+function setPop(open) {
+  pop.hidden = !open;
+  gear.setAttribute("aria-expanded", String(open));
+  if (open) pop.querySelector("input:checked").focus();
+}
+gear.addEventListener("click", () => setPop(pop.hidden));
+document.addEventListener("click", e => { if (!pop.hidden && !pop.contains(e.target) && !gear.contains(e.target)) setPop(false); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !pop.hidden) { setPop(false); gear.focus(); } });
+function settingsChanged() {
+  gear.querySelector(".dot").hidden = form("mode") === "together" && $("sections").checked;
+  if (last && !out.hidden) render();
+}
+$("mode").addEventListener("change", settingsChanged);
+$("sections").addEventListener("change", settingsChanged);
 $("quotes").addEventListener("change", () => { recount(); refresh(); });
 go.addEventListener("click", run);
 
