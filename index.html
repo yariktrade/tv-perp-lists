@@ -165,23 +165,39 @@ const STALE_DAYS = 7;  // "Hide stale": no price from TradingView for this long 
 const BASE_KINDS = [["spot", "Spot"], ["perp", "Perps"]]; // dated futures left out: few under USDT/USDC, and they expire
 const TRADFI = [["tradfi", "TradFi"]];
 const TRADFI_SPLIT = [["stock", "Stocks"], ["index", "Indices"], ["metal", "Metals"], ["cmdty", "Commod."], ["fx", "FX"]];
-const KIND_FULL = { spot: "Spot", perp: "Perps", tradfi: "TradFi", stock: "Stocks & ETF", index: "Indices", metal: "Metals", cmdty: "Commodities", fx: "FX" };
+const KIND_FULL = { spot: "Spot", perp: "Perps", tradfi: "TradFi", stock: "Stocks", index: "Indices", metal: "Metals", cmdty: "Commodities", fx: "FX" };
 const KIND_FILE = { spot: "spot", perp: "perps", tradfi: "tradfi", stock: "stocks", index: "indices", metal: "metals", cmdty: "commodities", fx: "fx" };
 const SUBS = TRADFI_SPLIT.map(([k]) => k);
 const splitOn = () => $("split").checked;
 const kinds = () => [...BASE_KINDS, ...(splitOn() ? TRADFI_SPLIT : TRADFI)];
-// TradingView has no subtype for TradFi, so the split guesses it from the ticker: FX pairs, metals,
-// energy and farm goods, and indices are short known lists; everything else counts as stocks and ETFs.
-// On 2026-10-22 it agreed with the exchanges' own classes for 1167 of 1170 symbols (misses: IAU, SLV, H100).
+// TradingView has no subtype for TradFi, so the split classifies by the underlying, guessed from the ticker:
+//   Stocks      one company, including leveraged funds on a single stock (TSLL, NVDL, CONL);
+//   Indices     index contracts (US500, SPX500, NAS100) and funds on a basket or an index: broad, sector,
+//               country, bond and volatility ETFs (SPY, QQQ, IWM, XLK, EWJ, TLT, UVXY), crypto funds (IBIT) too;
+//   Metals      metal contracts and metal funds (XAU, GOLD, GLD, SLV);
+//   Commodities energy, farm and freight contracts and funds (CL, NATGAS, USO, CORN, BWET), GPU compute (H100);
+//   FX          currency pairs.
+// Funds are a known list (TradingView does not flag them); a fund missing from it falls back to Stocks.
 const CCY = "USD|EUR|GBP|JPY|CHF|AUD|NZD|CAD|SGD|HKD|CNH|CNY|SEK|NOK|DKK|PLN|TRY|ZAR|MXN|BRL|ARS|INR|IDR|KRW|TWD|THB|ILS|RUB|HUF|CZK";
+const FUNDS = {
+  index: new Set(("SPY SPYM VOO IVV QQQ QLD TQQQ SQQQ SPXL UPRO UDOW DIA IWM TNA TZA SCHD VUG VGT JEPQ MAGS FNGU " +
+    "XLB XLE XLF XLI XLK XLP XLU XLV XLY SMH SOXX SOXL SOXS SOXQ KRE XBI IBB LABU IGV CIBR BOTZ AIQ ARKK ARKG IYF VFH " +
+    "XME OIH XOP URA URNM REMX COPX GDX GDXJ SIL SILJ NUGT KWEB BUG DFEN SHLD DRAM RAM LYTE NCLD " +
+    "EWH EWJ EWT EWY EWZ FXI INDA EEM EFA IEFA IEMG VGK VWO FLKR ARGT KODEX200 KORU KSTR " +
+    "TLT TBT TMF IEF LQD HYG AGG SGOV BIL USHY UVXY BVOL EVOL VOLX GVZ DXYZ IBIT BITO FBTC BITX ZCSH").split(" ")),
+  metal: new Set("GLD IAU SLV UGL AGQ".split(" ")),
+  cmdty: new Set("USO UCO BOIL GSG BWET".split(" ")),
+};
 const TF_RULES = [
   ["fx", new RegExp(`^(${CCY})(${CCY})$`)],
-  ["metal", /^(X(AU|AG|PT|PD)[A-Z]*|XCU|XAL|XNI|XPB\d*|XZN|GOLD(XAU|CIR)?|SILVER(XAG)?|PLATINUM(XPT)?|PALLADIUM(XPD)?|COPPER|ALUMIN(I)?UM(XAL)?|NICKEL(XNI)?|ZINC(XZN)?|LEAD(XPB)?)$/],
-  ["cmdty", /^(CL|BZ|NG|NGAS|NATGAS|NATURALGAS(NG)?|USOIL|UKOIL(UST\.P)?|WTIOIL|OILWTI|BRENTOIL|OILBRENT|XTI|XBR|HEATINGOIL|CORN|WHEAT|SOYBEAN|COFFEE|SUGAR|COCOA|COTTON)$/],
+  ["metal", /^(X(AU|AG|PT|PD)[A-Z]*|XCU|XAL|XNI|XPB\d*|XZN|GOLD(XAU|CIR)?|SILVER(XAG)?|PLATINUM(XPT)?|PALLADIUM(XPD)?|COPPER|ALUMIN(I)?UM(XAL)?|NICKEL(XNI)?|ZINC(XZN)?|LEAD(XPB)?|TUNGSTEN)$/],
+  ["cmdty", /^(CL|BZ|NG|NGAS|NATGAS|NATURALGAS(NG)?|USOIL|UKOIL(UST\.P)?|WTIOIL|OILWTI|BRENTOIL|OILBRENT|XTI|XBR|HEATINGOIL|CORN|WHEAT|SOYBEAN|COFFEE|SUGAR|COCOA|COTTON|H100|B200)$/],
   ["index", /^(US30|US100|US500|US2000(USD)?|NAS100|NASDAQ100|NDX100|SP500|SPX500|DJ30|DOWJONES|GER40|DE30EUR|DE40|UK100(GBP)?|FR40(EUR)?|EU50(EUR)?|JP225(USD)?|JPN225|NIKKEI225|HK50(\.P)?|HK33HKD|HSCHKD|AU200AUD|AUS200|KOSPI|KR200|NIFTY50|NIFTYBANK|RUSSELL2000|TECH100|VIX|USDOLLARINDEXDXY|DXY|COIN50|BTCDVOL|[A-Z0-9]+IXUST\.P|[BE]VIVUST\.P)$/],
 ];
 function tradfiSub(symbol) {
   const root = symbol.split(":")[1].replace(/(USDT|USDC)(\.P|\d{2}[A-Z]\d{4})?$/, "");
+  const names = [root, root.replace(/(STOCK|ETF|US)$/, "")]; // some exchanges suffix tickers: DIASTOCK, SMHUS, IBBETF
+  for (const [cls, set] of Object.entries(FUNDS)) if (names.some(n => set.has(n))) return cls;
   return (TF_RULES.find(([, re]) => re.test(root)) || ["stock"])[0];
 }
 
