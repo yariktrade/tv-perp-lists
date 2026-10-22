@@ -12,6 +12,10 @@ const t0 = Date.now();
 const report = o => { const pre = document.createElement("pre"); pre.id = "check-result"; pre.textContent = JSON.stringify(o); document.body.append(pre); };
 (function waitTable() {
   const corner = document.querySelector("#head input");
+  if (corner) {
+    const shown = id => getComputedStyle(document.getElementById(id)).display !== "none";
+    if (shown("settings") || shown("out")) return report({ errors: ["settings panel or output is visible on load"] });
+  }
   if (corner) document.querySelectorAll("#quotes input").forEach(i => { if (!i.checked) i.click(); });
   if (!corner) { if (Date.now() - t0 < 30000) return setTimeout(waitTable, 200); return report({ errors: ["matrix did not load"] }); }
   const cells = document.querySelectorAll("#body td input:not([disabled])").length;
