@@ -25,8 +25,9 @@ body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--f-
 .wrap { max-width: 640px; margin: 0 auto; padding-top: max(16px, env(safe-area-inset-top, 0px));
   padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px));
   display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
-input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; flex: none; }
-.quotes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+input[type=checkbox], input[type=radio] { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; flex: none; }
+.opts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.grp { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px;
   background: var(--surface); cursor: pointer; user-select: none; font-size: 13px; font-weight: 500; }
 .chip:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
@@ -77,9 +78,16 @@ textarea { width: 100%; height: 64px; resize: vertical; font-family: var(--f-mon
 </head>
 <body>
 <main class="wrap">
-  <div class="quotes" id="quotes" role="group" aria-label="Quote currency">
-    <label class="chip"><input type="checkbox" value="USDT" checked> USDT</label>
-    <label class="chip"><input type="checkbox" value="USDC"> USDC</label>
+  <div class="opts">
+    <div class="grp" id="quotes" role="group" aria-label="Quote currency">
+      <label class="chip"><input type="checkbox" value="USDT" checked> USDT</label>
+      <label class="chip"><input type="checkbox" value="USDC"> USDC</label>
+    </div>
+    <div class="grp" id="mode" role="radiogroup" aria-label="Lists">
+      <label class="chip"><input type="radio" name="mode" value="together" checked> Together</label>
+      <label class="chip"><input type="radio" name="mode" value="separate"> Separate</label>
+    </div>
+    <label class="chip"><input type="checkbox" id="sections" checked> Sections in file</label>
   </div>
   <div class="matrix">
     <table>
@@ -206,6 +214,7 @@ function refresh() {
   $("sel").textContent = picked.length ? `${fmt(total)} symbols` : "Nothing selected";
   go.disabled = !picked.length;
   out.hidden = true;
+  last = null;
 }
 
 const note = (text, error) => Object.assign(document.createElement("p"), { className: error ? "note error" : "note", textContent: text });
@@ -230,7 +239,7 @@ function listBox(list) {
   ta.value = text;
   box.querySelector("button").addEventListener("click", () => copyText(text, ta, msg));
   const a = box.querySelector("a");
-  a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+  a.href = URL.createObjectURL(new Blob([list.text], { type: "text/plain" }));
   a.download = list.file;
   return box;
 }
@@ -261,44 +270,89 @@ function zip(files) {
   return new Blob([...parts, ...central, end.buffer], { type: "application/zip" });
 }
 
+let last = null; // { order, byCell } from the latest Generate; mode and sections re-render it without a new request
+
 async function run() {
   const cells = [...selected].filter(c => counts.get(c));
   const exs = [...new Set(cells.map(c => c.split("|")[0]))];
   const qs = quotes();
   go.disabled = true; go.textContent = "Loading…";
-  for (const a of out.querySelectorAll("a[href^=blob]")) URL.revokeObjectURL(a.href);
-  out.replaceChildren();
   try {
     const fresh = await scan(exs);
     const byCell = new Map(cells.map(c => [c, []]));
     for (const r of fresh) if (qs.has(r.q)) { const c = byCell.get(key(r.ex, r.k)); if (c) c.push(r.s); }
     const order = visibleEx().flatMap(ex => KINDS.map(([k]) => key(ex, k))).filter(c => byCell.has(c) && byCell.get(c).length);
     for (const c of order) byCell.get(c).sort();
-    const all = order.flatMap(c => byCell.get(c));
-    const label = c => { const [ex, k] = c.split("|"); return `${NAME[ex] || ex} · ${KINDS.find(x => x[0] === k)[1]}`; };
-    const slug = c => { const [ex, k] = c.split("|"); return `${ex.toLowerCase()}-${KIND_FILE[k]}`; };
-    let lists;
-    if (!all.length) out.append(note("No symbols for this selection"));
-    else if (all.length <= TV_LIMIT) lists = [{ title: order.length <= 3 ? order.map(label).join(" + ") : "All selected", items: all,
-      file: `tradingview-${order.length <= 3 ? order.map(slug).join("-") : "watchlist"}.txt` }];
-    else {
-      out.append(note(`A TradingView watchlist holds up to ${fmt(TV_LIMIT)} symbols, so each cell gets its own list.`));
-      lists = order.flatMap(c => chunk(byCell.get(c), TV_LIMIT).map((items, i, arr) => ({
-        title: label(c) + (arr.length > 1 ? ` · part ${i + 1}` : ""), items,
-        file: `tradingview-${slug(c)}${arr.length > 1 ? "-" + (i + 1) : ""}.txt` })));
-    }
-    if (lists && lists.length > 1) {
-      const a = Object.assign(document.createElement("a"), { className: "btn ghost", textContent: `Download all (.zip, ${lists.length} files)`,
-        href: URL.createObjectURL(zip(lists.map(l => ({ name: l.file, text: l.items.join(",") })))), download: "tradingview-watchlists.zip" });
-      const row = document.createElement("div"); row.append(a); out.append(row);
-    }
-    for (const l of lists || []) out.append(listBox(l));
-  } catch (err) { out.append(note(err.message, true)); }
-  out.hidden = false;
+    last = { order, byCell };
+    render();
+  } catch (err) {
+    last = null;
+    out.replaceChildren(note(err.message, true));
+    out.hidden = false;
+  }
   go.textContent = "Generate"; go.disabled = false;
   out.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
 }
 
+const cellName = c => { const [ex, k] = c.split("|"); return `${NAME[ex] || ex} ${KINDS.find(x => x[0] === k)[1]}`; };
+const cellLabel = c => { const [ex, k] = c.split("|"); return `${NAME[ex] || ex} · ${KINDS.find(x => x[0] === k)[1]}`; };
+const cellSlug = c => { const [ex, k] = c.split("|"); return `${ex.toLowerCase()}-${KIND_FILE[k]}`; };
+
+// Fill lists of at most TV_LIMIT entries; with sections on, each "###Name" header takes a slot too.
+function pack(groups, sections) {
+  const parts = [];
+  let cur = [], used = 0;
+  for (const { cell, items } of groups) {
+    let i = 0;
+    while (i < items.length) {
+      const room = TV_LIMIT - used - (sections ? 1 : 0);
+      if (room <= 0) { parts.push(cur); cur = []; used = 0; continue; }
+      const take = items.slice(i, i + room);
+      cur.push({ cell, items: take });
+      used += take.length + (sections ? 1 : 0);
+      i += take.length;
+    }
+  }
+  if (cur.length) parts.push(cur);
+  return parts;
+}
+
+function render() {
+  for (const a of out.querySelectorAll("a[href^=blob]")) URL.revokeObjectURL(a.href);
+  out.replaceChildren();
+  out.hidden = false;
+  const { order, byCell } = last;
+  if (!order.length) { out.append(note("No symbols for this selection")); return; }
+  const sections = $("sections").checked;
+  const together = form("mode") === "together";
+  const groups = order.map(cell => ({ cell, items: byCell.get(cell) }));
+  let lists;
+  if (together) {
+    const parts = pack(groups, sections);
+    lists = parts.map((g, i) => ({ groups: g,
+      title: "Watchlist" + (parts.length > 1 ? ` · part ${i + 1} of ${parts.length}` : ""),
+      file: `tradingview-watchlist${parts.length > 1 ? "-part-" + (i + 1) : ""}.txt` }));
+  } else {
+    lists = groups.flatMap(g => pack([g], sections).map((p, i, arr) => ({ groups: p,
+      title: cellLabel(g.cell) + (arr.length > 1 ? ` · part ${i + 1}` : ""),
+      file: `tradingview-${cellSlug(g.cell)}${arr.length > 1 ? "-" + (i + 1) : ""}.txt` })));
+  }
+  for (const l of lists) {
+    l.items = l.groups.flatMap(g => g.items);
+    l.text = sections ? l.groups.flatMap(g => [`###${cellName(g.cell)}`, ...g.items]).join(",") : l.items.join(",");
+  }
+  if (together && lists.length > 1) out.append(note(`A TradingView watchlist holds up to ${fmt(TV_LIMIT)} entries, so the list is split into ${lists.length} parts.`));
+  if (lists.length > 1) {
+    const a = Object.assign(document.createElement("a"), { className: "btn ghost", textContent: `Download all (.zip, ${lists.length} files)`,
+      href: URL.createObjectURL(zip(lists.map(l => ({ name: l.file, text: l.text })))), download: "tradingview-watchlists.zip" });
+    const row = document.createElement("div"); row.append(a); out.append(row);
+  }
+  for (const l of lists) out.append(listBox(l));
+}
+
+const form = name => document.querySelector(`input[name=${name}]:checked`).value;
+$("mode").addEventListener("change", () => { if (last && !out.hidden) render(); });
+$("sections").addEventListener("change", () => { if (last && !out.hidden) render(); });
 $("quotes").addEventListener("change", () => { recount(); refresh(); });
 go.addEventListener("click", run);
 
