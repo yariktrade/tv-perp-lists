@@ -32,7 +32,9 @@ input[type=checkbox], input[type=radio] { accent-color: var(--accent); width: 16
   background: var(--surface); cursor: pointer; user-select: none; font-size: 13px; font-weight: 500; }
 .chip:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .matrix { overflow: clip; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+/* Fixed layout: the exchange column takes 31%, the four market columns split the rest equally. */
+table { width: 100%; table-layout: fixed; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+col.name { width: 31%; }
 th, td { padding: 0; border-bottom: 1px solid var(--line); }
 thead th { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 1; background: var(--surface); font-size: 11px; font-weight: 500;
   text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); box-shadow: inset 0 -1px 0 var(--line); }
@@ -40,11 +42,13 @@ tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--row); }
 tbody th { text-align: left; font-weight: 500; white-space: nowrap; }
 label.c { display: flex; align-items: center; gap: 7px; padding: 6px 10px; min-height: 34px; cursor: pointer; user-select: none; }
-td label.c, thead th:not(:first-child) label.c { justify-content: center; }
+label.c span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Same left inset in every cell of a column, header included, so the checkboxes line up vertically. */
+td label.c, thead th:not(:first-child) label.c { padding-left: 14px; }
 td .n { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
 td:has(input:checked) { background: var(--accent-soft); }
 td:has(input:checked) .n { color: var(--fg); }
-td.off { color: var(--muted); text-align: center; font-family: var(--f-mono); font-size: 12px; }
+td.off { color: var(--muted); font-family: var(--f-mono); font-size: 12px; }
 .bar { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px;
   background: var(--bg); border-top: 1px solid var(--line); padding-block: 10px max(10px, env(safe-area-inset-bottom, 0px)); }
 .sel { font-size: 13px; color: var(--muted); font-family: var(--f-mono); }
@@ -66,10 +70,10 @@ textarea { width: 100%; height: 64px; resize: vertical; font-family: var(--f-mon
   padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); }
 .note { font-size: 12.5px; color: var(--muted); margin: 0; }
 .note.error { color: var(--error); }
-@media (max-width: 560px) {
+@media (max-width: 600px) {
   label.c { padding: 6px 4px; gap: 6px; }
   tbody th label.c, thead th:first-child label.c { padding-left: 8px; }
-  td label.c, thead th:not(:first-child) label.c { flex-direction: column; gap: 3px; min-height: 44px; }
+  td label.c, thead th:not(:first-child) label.c { flex-direction: column; justify-content: center; gap: 3px; min-height: 44px; padding-left: 4px; }
   thead th { font-size: 10px; letter-spacing: 0.02em; }
   tbody th { font-size: 13px; }
   td .n { font-size: 11px; }
@@ -91,8 +95,9 @@ textarea { width: 100%; height: 64px; resize: vertical; font-family: var(--f-mon
   </div>
   <div class="matrix">
     <table>
+      <colgroup><col class="name"><col><col><col><col></colgroup>
       <thead><tr id="head"></tr></thead>
-      <tbody id="body"><tr><td class="off" style="padding:14px">Loading…</td></tr></tbody>
+      <tbody id="body"><tr><td class="off" colspan="5" style="padding:14px">Loading…</td></tr></tbody>
     </table>
   </div>
   <p class="note error" id="loaderr" hidden></p>
