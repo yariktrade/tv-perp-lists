@@ -65,9 +65,10 @@ textarea { width: 100%; height: 64px; resize: vertical; font-family: var(--f-mon
   padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); }
 table.dense td label.c, table.dense thead th:not(:first-child) label.c { flex-direction: column; justify-content: center; gap: 3px; min-height: 44px; padding-left: 2px; padding-right: 2px; }
 @media (max-width: 600px) {
-  table.dense thead th { vertical-align: top; } /* checkboxes on one line, labels hang below */
-  table.dense thead th:not(:first-child) label.c { justify-content: flex-start; }
-  table.dense thead th:first-child label.c { align-items: flex-start; }
+  /* Labels read bottom to top, so each starts at its checkbox: checkboxes sit on one line at the bottom of the header. */
+  table.dense thead th { vertical-align: bottom; }
+  table.dense thead th:not(:first-child) label.c { flex-direction: column-reverse; justify-content: flex-start; }
+  table.dense thead th:first-child label.c { align-items: flex-end; }
   table.dense thead th:not(:first-child) label.c span { writing-mode: vertical-rl; transform: rotate(180deg); max-height: 64px; }
   table.dense td .n { font-size: 10px; letter-spacing: -0.02em; }
   label.c { padding: 6px 4px; gap: 6px; }
