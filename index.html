@@ -53,7 +53,7 @@ input[type=checkbox], input[type=radio] { accent-color: var(--accent); width: 16
   background: var(--surface); cursor: pointer; user-select: none; font-size: 13px; font-weight: 500; }
 .chip:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .matrix { overflow: clip; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
-/* Fixed layout: each visible market column gets 17.25%, the exchange column takes the rest (31% with all four). */
+/* Fixed layout: each visible market column gets 23% (or an equal share of 76% when there are many), the exchange column the rest. */
 table { width: 100%; table-layout: fixed; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 th, td { padding: 0; border-bottom: 1px solid var(--line); }
 thead th { position: sticky; top: var(--head-h, 0px); z-index: 1; background: var(--surface); font-size: 11px; font-weight: 500;
@@ -213,11 +213,11 @@ const KNOWN = [ // display names; these CEXes lead in this order, every other ex
   ["BITRUE", "Bitrue"], ["BITSTAMP", "Bitstamp"], ["COINJAR", "CoinJar"], ["BITAZZA", "Bitazza"], ["BITSO", "Bitso"],
   ["BITFLYER", "bitFlyer"],
 ];
-const BASE_KINDS = [["spot", "Spot"], ["perp", "Perps"], ["fut", "Futures"]];
+const BASE_KINDS = [["spot", "Spot"], ["perp", "Perps"]]; // dated futures left out: few under USDT/USDC, and they expire
 const TRADFI = [["tradfi", "TradFi"]];
 const TRADFI_SPLIT = [["stock", "Stocks"], ["index", "Indices"], ["metal", "Metals"], ["cmdty", "Commod."], ["fx", "FX"]];
-const KIND_FULL = { spot: "Spot", perp: "Perps", fut: "Futures", tradfi: "TradFi", stock: "Stocks & ETF", index: "Indices", metal: "Metals", cmdty: "Commodities", fx: "FX" };
-const KIND_FILE = { spot: "spot", perp: "perps", fut: "futures", tradfi: "tradfi", stock: "stocks", index: "indices", metal: "metals", cmdty: "commodities", fx: "fx" };
+const KIND_FULL = { spot: "Spot", perp: "Perps", tradfi: "TradFi", stock: "Stocks & ETF", index: "Indices", metal: "Metals", cmdty: "Commodities", fx: "FX" };
+const KIND_FILE = { spot: "spot", perp: "perps", tradfi: "tradfi", stock: "stocks", index: "indices", metal: "metals", cmdty: "commodities", fx: "fx" };
 const SUBS = TRADFI_SPLIT.map(([k]) => k);
 const splitOn = () => $("split").checked;
 const kinds = () => [...BASE_KINDS, ...(splitOn() ? TRADFI_SPLIT : TRADFI)];
@@ -260,13 +260,13 @@ function exParts(ex) {
 }
 const exName = ex => { const { title, sub } = exParts(ex); return sub ? `${title} ${sub}` : title; };
 
-const kindOf = (type, base) => type === "spot" ? "spot" : !base ? "tradfi" : type === "swap" ? "perp" : "fut";
+const kindOf = (type, base) => type === "spot" ? "spot" : !base ? "tradfi" : "perp";
 const key = (ex, k) => `${ex}|${k}`;
 const fmt = n => n.toLocaleString("en-US");
 
 async function scan(exchanges) { // all exchanges when none are given
   const body = { columns: ["exchange", "type", "currency", "base_currency", "centralization"], range: [0, 300000],
-    filter: [{ left: "type", operation: "in_range", right: ["spot", "swap", "futures"] },
+    filter: [{ left: "type", operation: "in_range", right: ["spot", "swap"] },
              { left: "currency", operation: "in_range", right: ["USDT", "USDC"] }] };
   if (exchanges) body.filter.push({ left: "exchange", operation: "in_range", right: exchanges });
   let r;
@@ -353,7 +353,7 @@ function refresh() {
   const shown = kinds().map(([k]) => exchanges.some(ex => enabled(ex, k)));
   for (const tr of [head, ...body.querySelectorAll("tr")]) shown.forEach((on, i) => { tr.children[i + 1].hidden = !on; });
   const n = shown.filter(Boolean).length;
-  const per = Math.min(17.25, 76 / Math.max(n, 1)); // up to four market columns at 17.25%; more share 76%
+  const per = Math.min(23, 76 / Math.max(n, 1)); // market columns: 23% each (three leave the exchange 31%), more share 76%
   $("cols").innerHTML = `<col style="width:${100 - n * per}%">` + "<col>".repeat(n);
   document.querySelector(".matrix table").classList.toggle("dense", n > 4);
   for (const td of body.querySelectorAll("td")) {
