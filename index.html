@@ -19,7 +19,7 @@
 .name { grid-area: name; margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .opts { grid-area: quote; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
 .field { display: flex; align-items: center; gap: 8px; }
-.gearwrap { grid-area: gear; position: relative; display: flex; }
+.gearwrap { grid-area: gear; position: relative; display: flex; gap: 8px; }
 
 @media (max-width: 680px) {
   .top { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name gear" "quote quote"; }
@@ -50,9 +50,6 @@ td.off { color: var(--muted); font-family: var(--f-mono); font-size: 12px; }
 .pop { position: absolute; z-index: 5; right: 0; top: calc(100% + 6px); width: min(300px, calc(100vw - 24px)); display: grid; gap: 12px; padding: 12px 14px;
   background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 28px var(--shadow); }
 .pop hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
-.pop-link { font-size: 13px; font-weight: 500; color: var(--accent); text-decoration: none; }
-.pop-link::after { content: " →"; }
-.pop-link:hover { text-decoration: underline; }
 .pop-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; }
 label.pop-row { cursor: pointer; }
 #out { display: grid; gap: 14px; padding-bottom: 24px; scroll-margin-top: 12px; }
@@ -101,6 +98,9 @@ table.dense td label.c, table.dense thead th:not(:first-child) label.c { flex-di
       </div>
     </div>
     <div class="gearwrap">
+      <a class="icon" href="log.html" aria-label="Changes log" title="Changes log">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+      </a>
       <button type="button" class="icon" id="gear" aria-label="Settings" aria-expanded="false" aria-controls="settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
@@ -134,8 +134,7 @@ table.dense td label.c, table.dense thead th:not(:first-child) label.c { flex-di
             <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
           </div>
         </div>
-        <hr>
-        <a class="pop-link" href="log.html">Changes log</a>
+
       </div>
     </div>
   </header>
