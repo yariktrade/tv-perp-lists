@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Opens index.html in headless Chrome, waits for the live exchange matrix, ticks the
-# whole table, presses "Сформировать" and checks the generated lists. Prints PASS or FAIL.
+# whole table, presses "Generate" and checks the generated lists. Prints PASS or FAIL.
 set -euo pipefail
 cd "$(dirname "$0")"
 CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
@@ -21,10 +21,10 @@ const report = o => { const pre = document.createElement("pre"); pre.id = "check
   document.getElementById("go").click();
   (function waitLists() {
     const out = document.getElementById("out"), go = document.getElementById("go");
-    if (!out.hidden && go.textContent === "Сформировать") report({
+    if (!out.hidden && go.textContent === "Generate") report({
       rows, cells, checked,
       lists: [...document.querySelectorAll(".list textarea")].map(t => t.value),
-      zip: !!document.querySelector('a[download="tradingview-lists.zip"]'),
+      zip: !!document.querySelector('a[download="tradingview-watchlists.zip"]'),
       errors: [...document.querySelectorAll(".note.error:not([hidden])")].map(n => n.textContent) });
     else if (Date.now() - t0 < 60000) setTimeout(waitLists, 200);
     else report({ errors: ["lists did not appear"] });

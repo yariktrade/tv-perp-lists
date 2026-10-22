@@ -1,15 +1,15 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Списки бирж для TradingView</title>
-<meta name="description" content="Живые списки USDT- и USDC-символов криптобирж для импорта в TradingView: спот, перпы, фьючерсы, TradFi">
+<title>Watchlist Builder</title>
+<meta name="description" content="Live USDT and USDC symbol lists from crypto exchanges, ready to import into TradingView: spot, perps, futures, TradFi">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: one column; exchange × market matrix, then generated lists. */
+/* Layout: one column; quote chips, exchange × market matrix, sticky action bar, generated lists. */
 :root {
   --bg: #F3F5F7; --surface: #FFFFFF; --fg: #131A20; --muted: #5A6570; --line: #D6DCE2; --row: #F7F9FA;
   --accent: #0A6B75; --accent-soft: #DDEFF0; --accent-fg: #FFFFFF; --error: #B42318;
@@ -21,82 +21,84 @@
   --bg: #0E1317; --surface: #151C21; --fg: #E4E9ED; --muted: #8C98A3; --line: #2A3540; --row: #182026;
   --accent: #4DBFC9; --accent-soft: #12333A; --accent-fg: #062126; --error: #F97066; color-scheme: dark } }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.45; }
-.wrap { max-width: 720px; margin: 0 auto; padding-block: max(32px, env(safe-area-inset-top, 0px)) 48px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
-h1 { font-size: 24px; font-weight: 600; line-height: 1.2; margin: 0; text-wrap: balance; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 14px; line-height: 1.4; }
+.wrap { max-width: 640px; margin: 0 auto; padding-top: max(16px, env(safe-area-inset-top, 0px));
+  padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; flex: none; }
-.matrix { overflow: auto; max-height: 70vh; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.quotes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--surface); cursor: pointer; user-select: none; font-size: 13px; font-weight: 500; }
+.chip:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.matrix { overflow: clip; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 th, td { padding: 0; border-bottom: 1px solid var(--line); }
-thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); font-size: 12px; font-weight: 500; text-transform: uppercase;
-  letter-spacing: 0.06em; color: var(--muted); box-shadow: inset 0 -1px 0 var(--line); }
+thead th { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 1; background: var(--surface); font-size: 11px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); box-shadow: inset 0 -1px 0 var(--line); }
 tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--row); }
-.quotes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.quotes .lbl { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-right: 4px; }
-.chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px;
-  background: var(--surface); cursor: pointer; user-select: none; font-size: 14px; }
-.chip:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
-label.c { display: flex; align-items: center; gap: 8px; padding: 9px 12px; cursor: pointer; user-select: none; min-height: 40px; }
-th:first-child label.c { justify-content: flex-start; }
-td label.c, thead th:not(:first-child) label.c { justify-content: center; }
 tbody th { text-align: left; font-weight: 500; white-space: nowrap; }
-tbody th, thead th:first-child { position: sticky; left: 0; background: var(--surface); box-shadow: inset -1px 0 0 var(--line); }
-thead th:first-child { z-index: 2; box-shadow: inset -1px -1px 0 var(--line); }
-@media (max-width: 520px) { label.c { padding: 8px; gap: 6px; } thead th { letter-spacing: 0.02em; } }
-td .n { font-family: var(--f-mono); font-size: 12.5px; color: var(--muted); min-width: 3.5ch; text-align: right; }
+label.c { display: flex; align-items: center; gap: 7px; padding: 6px 10px; min-height: 34px; cursor: pointer; user-select: none; }
+td label.c, thead th:not(:first-child) label.c { justify-content: center; }
+td .n { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
 td:has(input:checked) { background: var(--accent-soft); }
 td:has(input:checked) .n { color: var(--fg); }
-td.off { color: var(--muted); text-align: center; font-family: var(--f-mono); font-size: 12.5px; }
-.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.btn { font: inherit; font-weight: 500; padding: 10px 18px; border-radius: 6px; cursor: pointer; border: 1px solid var(--accent); text-decoration: none; display: inline-block; }
-.btn.primary { background: var(--accent); color: var(--accent-fg); }
+td.off { color: var(--muted); text-align: center; font-family: var(--f-mono); font-size: 12px; }
+.bar { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--bg); border-top: 1px solid var(--line); padding-block: 10px max(10px, env(safe-area-inset-bottom, 0px)); }
+.sel { font-size: 13px; color: var(--muted); font-family: var(--f-mono); }
+.btn { font: inherit; font-weight: 500; border-radius: 6px; cursor: pointer; border: 1px solid var(--accent); text-decoration: none;
+  display: inline-block; white-space: nowrap; }
+.btn.primary { background: var(--accent); color: var(--accent-fg); padding: 8px 18px; }
 .btn.primary:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn.ghost { background: transparent; color: var(--accent); padding: 7px 14px; font-size: 14px; }
+.btn.ghost { background: transparent; color: var(--accent); padding: 4px 10px; font-size: 13px; }
 .btn.ghost:hover { background: var(--accent-soft); }
 .btn:focus-visible, label:has(input:focus-visible), textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.sel { font-size: 13px; color: var(--muted); font-family: var(--f-mono); }
-#out { display: grid; gap: 20px; }
-.list { display: grid; gap: 8px; }
-.list-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; }
-.list-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
-.list-head .n { font-family: var(--f-mono); font-size: 13px; color: var(--muted); }
-.list-head .acts { margin-left: auto; display: flex; gap: 8px; align-items: center; }
-.msg { font-size: 13px; color: var(--muted); }
-textarea { width: 100%; height: 96px; resize: vertical; font-family: var(--f-mono); font-size: 12px; line-height: 1.5;
-  padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); }
-.note { font-size: 13px; color: var(--muted); margin: 0; }
+#out { display: grid; gap: 14px; padding-bottom: 24px; scroll-margin-top: 12px; }
+.list { display: grid; gap: 6px; }
+.list-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.list-head h2 { font-size: 14px; font-weight: 600; margin: 0; }
+.list-head .n { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.list-head .acts { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.msg { font-size: 12px; color: var(--muted); }
+textarea { width: 100%; height: 64px; resize: vertical; font-family: var(--f-mono); font-size: 11.5px; line-height: 1.45;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); }
+.note { font-size: 12.5px; color: var(--muted); margin: 0; }
 .note.error { color: var(--error); }
+@media (max-width: 560px) {
+  label.c { padding: 6px 4px; gap: 6px; }
+  tbody th label.c, thead th:first-child label.c { padding-left: 8px; }
+  td label.c, thead th:not(:first-child) label.c { flex-direction: column; gap: 3px; min-height: 44px; }
+  thead th { font-size: 10px; letter-spacing: 0.02em; }
+  tbody th { font-size: 13px; }
+  td .n { font-size: 11px; }
+}
 </style>
 </head>
 <body>
 <main class="wrap">
-  <h1>Списки бирж для TradingView</h1>
-  <div class="quotes" id="quotes" role="group" aria-label="Котировка">
-    <span class="lbl">Котировка</span>
+  <div class="quotes" id="quotes" role="group" aria-label="Quote currency">
     <label class="chip"><input type="checkbox" value="USDT" checked> USDT</label>
     <label class="chip"><input type="checkbox" value="USDC"> USDC</label>
   </div>
   <div class="matrix">
     <table>
       <thead><tr id="head"></tr></thead>
-      <tbody id="body"><tr><td class="off" style="padding:16px">Загрузка…</td></tr></tbody>
+      <tbody id="body"><tr><td class="off" style="padding:14px">Loading…</td></tr></tbody>
     </table>
   </div>
   <p class="note error" id="loaderr" hidden></p>
   <div class="bar">
-    <button type="button" class="btn primary" id="go" disabled>Сформировать</button>
-    <span class="sel" id="sel"></span>
+    <span class="sel" id="sel">Nothing selected</span>
+    <button type="button" class="btn primary" id="go" disabled>Generate</button>
   </div>
   <section id="out" hidden aria-live="polite"></section>
 </main>
 
 <script>
-// Source: TradingView's own symbol scanner, queried live (it allows cross-origin
-// requests), so every symbol is importable by construction. A derivative without a
-// base currency is a tokenised stock, ETF, index, commodity or FX pair — "TradFi".
+// Source: TradingView's public symbol scanner, queried anonymously from this page (it
+// allows cross-origin requests and no cookies are sent), so every symbol is importable.
+// A derivative without a base currency is a stock, ETF, index, commodity or FX pair: "TradFi".
 const SCANNER = "https://scanner.tradingview.com/crypto/scan";
 const TV_LIMIT = 1000; // symbols per TradingView watchlist
 const EXCHANGES = [ // centralised exchanges only, roughly by popularity
@@ -111,12 +113,13 @@ const EXCHANGES = [ // centralised exchanges only, roughly by popularity
   ["BITRUE", "Bitrue"], ["BITSTAMP", "Bitstamp"], ["COINJAR", "CoinJar"], ["BITAZZA", "Bitazza"], ["BITSO", "Bitso"],
   ["BITFLYER", "bitFlyer"],
 ];
-const KINDS = [["spot", "Спот"], ["perp", "Перпы"], ["fut", "Фьючерсы"], ["tradfi", "TradFi"]];
+const KINDS = [["spot", "Spot"], ["perp", "Perps"], ["fut", "Futures"], ["tradfi", "TradFi"]];
 const KIND_FILE = { spot: "spot", perp: "perps", fut: "futures", tradfi: "tradfi" };
 const NAME = Object.fromEntries(EXCHANGES);
 
 const kindOf = (type, base) => type === "spot" ? "spot" : !base ? "tradfi" : type === "swap" ? "perp" : "fut";
 const key = (ex, k) => `${ex}|${k}`;
+const fmt = n => n.toLocaleString("en-US");
 
 async function scan(exchanges) {
   const body = { columns: ["exchange", "type", "currency", "base_currency"], range: [0, 200000],
@@ -126,7 +129,7 @@ async function scan(exchanges) {
   let r;
   // A plain-text body keeps this a simple CORS request (no preflight).
   try { r = await fetch(SCANNER, { method: "POST", body: JSON.stringify(body), cache: "no-store" }); }
-  catch (_) { throw new Error("TradingView не ответил"); }
+  catch (_) { throw new Error("TradingView did not respond"); }
   if (!r.ok) throw new Error(`TradingView: HTTP ${r.status}`);
   const j = await r.json();
   return j.data.map(x => ({ s: x.s, ex: x.d[0], k: kindOf(x.d[1], x.d[3]), q: x.d[2] }));
@@ -148,25 +151,28 @@ const enabled = (ex, k) => (counts.get(key(ex, k)) || 0) > 0;
 
 function headerBox(label, aria, cells) {
   const th = document.createElement("th");
-  th.innerHTML = `<label class="c"><input type="checkbox" aria-label="${aria}"> <span>${label}</span></label>`;
+  th.innerHTML = `<label class="c"><input type="checkbox"> <span></span></label>`;
+  th.querySelector("input").setAttribute("aria-label", aria);
+  th.querySelector("span").textContent = label;
   th.querySelector("input")._cells = cells;
   return th;
 }
 
 function buildTable() {
   const exs = visibleEx();
-  head.replaceChildren(headerBox("Все", "Выбрать всю таблицу", () => exs.flatMap(ex => KINDS.map(([k]) => [ex, k]))));
-  for (const [k, label] of KINDS) head.append(headerBox(label, `Выбрать столбец ${label}`, () => exs.map(ex => [ex, k])));
+  head.replaceChildren(headerBox("All", "Select the whole table", () => exs.flatMap(ex => KINDS.map(([k]) => [ex, k]))));
+  for (const [k, label] of KINDS) head.append(headerBox(label, `Select column ${label}`, () => exs.map(ex => [ex, k])));
   body.replaceChildren();
   for (const ex of exs) {
     const tr = document.createElement("tr");
-    const th = headerBox(NAME[ex] || ex, `Выбрать строку ${NAME[ex] || ex}`, () => KINDS.map(([k]) => [ex, k]));
+    const th = headerBox(NAME[ex] || ex, `Select row ${NAME[ex] || ex}`, () => KINDS.map(([k]) => [ex, k]));
     th.setAttribute("scope", "row");
     tr.append(th);
     for (const [k, label] of KINDS) {
       const td = document.createElement("td");
       td.dataset.key = key(ex, k);
-      td.innerHTML = `<label class="c"><input type="checkbox" aria-label="${NAME[ex] || ex} — ${label}"> <span class="n"></span></label>`;
+      td.innerHTML = `<label class="c"><input type="checkbox"> <span class="n"></span></label>`;
+      td.querySelector("input").setAttribute("aria-label", `${NAME[ex] || ex}: ${label}`);
       td.querySelector("input").addEventListener("change", e => { e.target.checked ? selected.add(td.dataset.key) : selected.delete(td.dataset.key); refresh(); });
       tr.append(td);
     }
@@ -197,7 +203,7 @@ function refresh() {
   }
   const picked = [...selected].filter(c => counts.get(c));
   const total = picked.reduce((s, c) => s + counts.get(c), 0);
-  $("sel").textContent = picked.length ? `Символов: ${total}` : "";
+  $("sel").textContent = picked.length ? `${fmt(total)} symbols` : "Nothing selected";
   go.disabled = !picked.length;
   out.hidden = true;
 }
@@ -206,8 +212,8 @@ const note = (text, error) => Object.assign(document.createElement("p"), { class
 const chunk = (a, n) => a.length <= n ? [a] : Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, i * n + n));
 
 function copyText(text, ta, msg) {
-  const fallback = () => { ta.focus(); ta.select(); let ok = false; try { ok = document.execCommand("copy"); } catch (_) {} msg.textContent = ok ? "Скопировано" : "Выделено, нажмите ⌘C / Ctrl+C"; };
-  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => { msg.textContent = "Скопировано"; }, fallback);
+  const fallback = () => { ta.focus(); ta.select(); let ok = false; try { ok = document.execCommand("copy"); } catch (_) {} msg.textContent = ok ? "Copied" : "Selected, press ⌘C / Ctrl+C"; };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => { msg.textContent = "Copied"; }, fallback);
   else fallback();
 }
 
@@ -216,10 +222,10 @@ function listBox(list) {
   const box = document.createElement("div");
   box.className = "list";
   box.innerHTML = `<div class="list-head"><h2></h2><span class="n"></span><div class="acts"><span class="msg" role="status"></span>
-    <button type="button" class="btn ghost">Копировать</button><a class="btn ghost">Скачать .txt</a></div></div>
-    <textarea readonly aria-label="Символы"></textarea>`;
+    <button type="button" class="btn ghost">Copy</button><a class="btn ghost">Download</a></div></div>
+    <textarea readonly aria-label="Symbols"></textarea>`;
   box.querySelector("h2").textContent = list.title;
-  box.querySelector(".n").textContent = list.items.length;
+  box.querySelector(".n").textContent = fmt(list.items.length);
   const ta = box.querySelector("textarea"), msg = box.querySelector(".msg");
   ta.value = text;
   box.querySelector("button").addEventListener("click", () => copyText(text, ta, msg));
@@ -229,7 +235,7 @@ function listBox(list) {
   return box;
 }
 
-// Minimal store-only ZIP, so "download everything" is one file.
+// Minimal store-only ZIP, so "download all" is one file.
 const enc = new TextEncoder();
 const CRC = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
 const crc32 = b => { let c = 0xFFFFFFFF; for (const x of b) c = CRC[(c ^ x) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
@@ -259,7 +265,7 @@ async function run() {
   const cells = [...selected].filter(c => counts.get(c));
   const exs = [...new Set(cells.map(c => c.split("|")[0]))];
   const qs = quotes();
-  go.disabled = true; go.textContent = "Запрос…";
+  go.disabled = true; go.textContent = "Loading…";
   for (const a of out.querySelectorAll("a[href^=blob]")) URL.revokeObjectURL(a.href);
   out.replaceChildren();
   try {
@@ -272,24 +278,25 @@ async function run() {
     const label = c => { const [ex, k] = c.split("|"); return `${NAME[ex] || ex} · ${KINDS.find(x => x[0] === k)[1]}`; };
     const slug = c => { const [ex, k] = c.split("|"); return `${ex.toLowerCase()}-${KIND_FILE[k]}`; };
     let lists;
-    if (!all.length) out.append(note("Под этот выбор символов нет"));
-    else if (all.length <= TV_LIMIT) lists = [{ title: order.length <= 3 ? order.map(label).join(" + ") : "Все выбранные", items: all,
+    if (!all.length) out.append(note("No symbols for this selection"));
+    else if (all.length <= TV_LIMIT) lists = [{ title: order.length <= 3 ? order.map(label).join(" + ") : "All selected", items: all,
       file: `tradingview-${order.length <= 3 ? order.map(slug).join("-") : "watchlist"}.txt` }];
     else {
-      out.append(note(`В списке TradingView не больше ${TV_LIMIT} символов, поэтому по списку на ячейку`));
+      out.append(note(`A TradingView watchlist holds up to ${fmt(TV_LIMIT)} symbols, so each cell gets its own list.`));
       lists = order.flatMap(c => chunk(byCell.get(c), TV_LIMIT).map((items, i, arr) => ({
-        title: label(c) + (arr.length > 1 ? ` · часть ${i + 1}` : ""), items,
+        title: label(c) + (arr.length > 1 ? ` · part ${i + 1}` : ""), items,
         file: `tradingview-${slug(c)}${arr.length > 1 ? "-" + (i + 1) : ""}.txt` })));
     }
     if (lists && lists.length > 1) {
-      const a = Object.assign(document.createElement("a"), { className: "btn ghost", textContent: `Скачать все списки (.zip, ${lists.length} шт.)`,
-        href: URL.createObjectURL(zip(lists.map(l => ({ name: l.file, text: l.items.join(",") })))), download: "tradingview-lists.zip" });
-      const bar = document.createElement("div"); bar.className = "bar"; bar.append(a); out.append(bar);
+      const a = Object.assign(document.createElement("a"), { className: "btn ghost", textContent: `Download all (.zip, ${lists.length} files)`,
+        href: URL.createObjectURL(zip(lists.map(l => ({ name: l.file, text: l.items.join(",") })))), download: "tradingview-watchlists.zip" });
+      const row = document.createElement("div"); row.append(a); out.append(row);
     }
     for (const l of lists || []) out.append(listBox(l));
   } catch (err) { out.append(note(err.message, true)); }
   out.hidden = false;
-  go.textContent = "Сформировать"; go.disabled = false;
+  go.textContent = "Generate"; go.disabled = false;
+  out.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
 }
 
 $("quotes").addEventListener("change", () => { recount(); refresh(); });
@@ -297,7 +304,7 @@ go.addEventListener("click", run);
 
 (async () => {
   try { rows = await scan(EXCHANGES.map(e => e[0])); }
-  catch (err) { $("loaderr").textContent = `${err.message}, обновите страницу`; $("loaderr").hidden = false; return; }
+  catch (err) { $("loaderr").textContent = `${err.message}. Reload the page.`; $("loaderr").hidden = false; return; }
   recount(); buildTable(); refresh();
 })();
 </script>
