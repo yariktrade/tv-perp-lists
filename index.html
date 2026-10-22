@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Списки перпов для TradingView</title>
+<meta name="description" content="Живые списки USDT-перпов Bybit и Binance для импорта в TradingView">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one narrow column; form on top, generated lists below. */
+:root {
+  --bg: #F3F5F7; --surface: #FFFFFF; --fg: #131A20; --muted: #5A6570; --line: #D6DCE2;
+  --accent: #0A6B75; --accent-soft: #DDEFF0; --accent-fg: #FFFFFF; --error: #B42318;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #0E1317; --surface: #151C21; --fg: #E4E9ED; --muted: #8C98A3; --line: #2A3540;
+  --accent: #4DBFC9; --accent-soft: #12333A; --accent-fg: #062126; --error: #F97066; color-scheme: dark } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 560px; margin: 0 auto; padding-block: max(32px, env(safe-area-inset-top, 0px)) 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+h1 { font-size: 24px; font-weight: 600; line-height: 1.2; margin: 0; text-wrap: balance; }
+form { display: grid; gap: 18px; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+legend { padding: 0; margin-bottom: 8px; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+.opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.opt { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--surface); cursor: pointer; user-select: none; }
+.opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.opt input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+.btn { font: inherit; font-weight: 500; padding: 10px 18px; border-radius: 6px; cursor: pointer; border: 1px solid var(--accent); text-decoration: none; display: inline-block; }
+.btn.primary { background: var(--accent); color: var(--accent-fg); justify-self: start; }
+.btn.primary:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn.ghost { background: transparent; color: var(--accent); padding: 7px 14px; font-size: 14px; }
+.btn.ghost:hover { background: var(--accent-soft); }
+.btn:focus-visible, .opt:has(input:focus-visible), textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#out { display: grid; gap: 20px; }
+.list { display: grid; gap: 8px; }
+.list-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; }
+.list-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
+.list-head .n { font-family: var(--f-mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.list-head .acts { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.list-head .msg { font-size: 13px; color: var(--muted); }
+textarea { width: 100%; height: 120px; resize: vertical; font-family: var(--f-mono); font-size: 12px; line-height: 1.5;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); }
+.note { font-size: 13px; color: var(--muted); margin: 0; }
+.note.error { color: var(--error); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>Списки перпов для TradingView</h1>
+  <form id="f">
+    <fieldset>
+      <legend>Биржи</legend>
+      <div class="opts">
+        <label class="opt"><input type="checkbox" name="ex" value="bybit" checked> Bybit</label>
+        <label class="opt"><input type="checkbox" name="ex" value="binance" checked> Binance</label>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Активы</legend>
+      <div class="opts">
+        <label class="opt"><input type="checkbox" name="kind" value="crypto" checked> Крипто</label>
+        <label class="opt"><input type="checkbox" name="kind" value="equity"> Акции и ETF</label>
+        <label class="opt"><input type="checkbox" name="kind" value="commodity"> Сырьё</label>
+        <label class="opt"><input type="checkbox" name="kind" value="fx"> Валюты</label>
+      </div>
+    </fieldset>
+    <button type="submit" class="btn primary" id="go">Сформировать</button>
+  </form>
+  <section id="out" hidden aria-live="polite"></section>
+</main>
+
+<script>
+// USDT-margined perpetuals only. Every click re-queries the exchanges, then keeps
+// only the symbols TradingView's scanner resolves, so the import has no dead rows.
+const EX = { bybit: { tv: "BYBIT", name: "Bybit" }, binance: { tv: "BINANCE", name: "Binance" } };
+const BYBIT_KIND = { "": "crypto", innovation: "crypto", stock: "equity", ETF: "equity", commodity: "commodity", forex: "fx" };
+const BINANCE_KIND = { COIN: "crypto", INDEX: "crypto", EQUITY: "equity", CN_EQUITY: "equity", HK_EQUITY: "equity",
+  KR_EQUITY: "equity", PREMARKET: "equity", COMMODITY: "commodity", FX: "fx" };
+const KIND_FILE = { crypto: "crypto", equity: "stocks", commodity: "commodities", fx: "fx" };
+const TV_LIMIT = 1000; // symbols per TradingView watchlist
+
+async function getJson(url, label, init) {
+  let r;
+  try { r = await fetch(url, { cache: "no-store", ...init }); }
+  catch (_) { throw new Error(`${label} не ответил`); }
+  if (r.status === 451 || r.status === 403) throw new Error(`${label} недоступен из вашей страны (HTTP ${r.status})`);
+  if (!r.ok) throw new Error(`${label}: HTTP ${r.status}`);
+  return r.json();
+}
+
+async function fetchBybit() {
+  const rows = [];
+  let cursor = "";
+  for (let page = 0; page < 10; page++) {
+    const q = new URLSearchParams({ category: "linear", status: "Trading", limit: "1000" });
+    if (cursor) q.set("cursor", cursor);
+    const j = await getJson(`https://api.bybit.com/v5/market/instruments-info?${q}`, "Bybit");
+    if (j.retCode !== 0) throw new Error(`Bybit: ${j.retMsg}`);
+    rows.push(...j.result.list);
+    cursor = j.result.nextPageCursor;
+    if (!cursor) break;
+  }
+  return rows
+    .filter(x => x.quoteCoin === "USDT" && x.contractType === "LinearPerpetual" && x.status === "Trading")
+    .map(x => ({ sym: x.symbol, kind: BYBIT_KIND[x.symbolType || ""] }));
+}
+
+async function fetchBinance() {
+  const j = await getJson("https://fapi.binance.com/fapi/v1/exchangeInfo", "Binance");
+  return j.symbols
+    .filter(x => x.quoteAsset === "USDT" && x.status === "TRADING" && (x.contractType === "PERPETUAL" || x.contractType === "TRADIFI_PERPETUAL"))
+    .map(x => ({ sym: x.symbol, kind: BINANCE_KIND[x.underlyingType] }));
+}
+
+// Plain-text body keeps this a simple CORS request (no preflight).
+async function tvKnown(tickers) {
+  const j = await getJson("https://scanner.tradingview.com/crypto/scan", "TradingView",
+    { method: "POST", body: JSON.stringify({ symbols: { tickers }, columns: ["name"] }) });
+  return new Set(j.data.map(d => d.s));
+}
+
+const form = document.getElementById("f"), out = document.getElementById("out"), go = document.getElementById("go");
+const checked = name => [...form.querySelectorAll(`input[name=${name}]:checked`)].map(i => i.value);
+const note = (text, error) => Object.assign(document.createElement("p"), { className: error ? "note error" : "note", textContent: text });
+const chunk = (a, n) => a.length <= n ? [a] : Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, i * n + n));
+
+function listBox(title, items, file) {
+  const text = items.join(",");
+  const box = document.createElement("div");
+  box.className = "list";
+  box.innerHTML = `<div class="list-head"><h2></h2><span class="n"></span><div class="acts"><span class="msg" role="status"></span>
+    <button type="button" class="btn ghost">Копировать</button><a class="btn ghost">Скачать .txt</a></div></div>
+    <textarea readonly aria-label="Символы"></textarea>`;
+  box.querySelector("h2").textContent = title;
+  box.querySelector(".n").textContent = items.length;
+  const ta = box.querySelector("textarea"), msg = box.querySelector(".msg");
+  ta.value = text;
+  box.querySelector("button").addEventListener("click", () => {
+    const fallback = () => { ta.focus(); ta.select(); let ok = false; try { ok = document.execCommand("copy"); } catch (_) {} msg.textContent = ok ? "Скопировано" : "Выделено, нажмите ⌘C / Ctrl+C"; };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => { msg.textContent = "Скопировано"; }, fallback);
+    else fallback();
+  });
+  const a = box.querySelector("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+  a.download = file;
+  return box;
+}
+
+async function run() {
+  const exs = checked("ex"), kinds = checked("kind");
+  go.disabled = true; go.textContent = "Запрос…";
+  for (const a of out.querySelectorAll("a[href^=blob]")) URL.revokeObjectURL(a.href);
+  out.replaceChildren(); out.hidden = true;
+  const fetchers = { bybit: fetchBybit, binance: fetchBinance };
+  const results = await Promise.allSettled(exs.map(e => fetchers[e]()));
+  const errors = [], perEx = {};
+  results.forEach((r, i) => {
+    if (r.status === "rejected") { errors.push(r.reason.message); return; }
+    const e = exs[i];
+    perEx[e] = r.value.filter(x => kinds.includes(x.kind)).map(x => `${EX[e].tv}:${x.sym}.P`).sort();
+  });
+  const okEx = exs.filter(e => perEx[e]);
+  const all = okEx.flatMap(e => perEx[e]);
+  if (all.length) {
+    try {
+      const known = await tvKnown(all);
+      for (const e of okEx) perEx[e] = perEx[e].filter(s => known.has(s));
+    } catch (err) { errors.push(`${err.message}, символы не сверены с TradingView`); }
+  }
+  for (const m of errors) out.append(note(m, true));
+  const kept = okEx.flatMap(e => perEx[e]);
+  const tag = kinds.map(k => KIND_FILE[k]).join("-");
+  if (okEx.length && !kept.length) out.append(note("Под этот выбор символов нет"));
+  else if (kept.length <= TV_LIMIT) {
+    if (kept.length) out.append(listBox(okEx.map(e => EX[e].name).join(" + "), kept, `tradingview-${okEx.join("-")}-${tag}.txt`));
+  } else {
+    out.append(note(`В списке TradingView не больше ${TV_LIMIT} символов, поэтому списки разбиты по биржам`));
+    for (const e of okEx) chunk(perEx[e], TV_LIMIT).forEach((items, i, arr) => {
+      if (!items.length) return;
+      const part = arr.length > 1 ? i + 1 : 0;
+      out.append(listBox(EX[e].name + (part ? ` · часть ${part}` : ""), items, `tradingview-${e}-${tag}${part ? "-" + part : ""}.txt`));
+    });
+  }
+  out.hidden = false;
+  go.textContent = "Сформировать"; sync(false);
+}
+
+function sync(clear = true) {
+  go.disabled = !checked("ex").length || !checked("kind").length;
+  if (clear) out.hidden = true;
+}
+form.addEventListener("change", () => sync());
+form.addEventListener("submit", e => { e.preventDefault(); if (!go.disabled) run(); });
+sync();
+</script>
+</body>
+</html>
