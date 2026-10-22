@@ -21,7 +21,8 @@ const report = o => { const pre = document.createElement("pre"); pre.id = "check
     const empty = [...document.querySelectorAll("#body tr:not([hidden])")].filter(tr => !tr.querySelector("td input:not([disabled])")).length;
     if (empty) return report({ errors: [`${empty} visible exchange rows have no USDT symbols`] });
   }
-  if (corner) document.querySelectorAll("#quotes input").forEach(i => { if (!i.checked) i.click(); });
+  const cexRows = document.querySelectorAll("#body tr:not([hidden])").length;
+  if (corner) document.querySelectorAll("#quotes input, #venues input").forEach(i => { if (!i.checked) i.click(); });
   if (!corner) { if (Date.now() - t0 < 30000) return setTimeout(waitTable, 200); return report({ errors: ["matrix did not load"] }); }
   const cells = document.querySelectorAll("#body td input:not([disabled])").length;
   corner.click();
@@ -43,7 +44,7 @@ const report = o => { const pre = document.createElement("pre"); pre.id = "check
     const separate = document.querySelectorAll(".list").length;
     document.getElementById("sections").click();
     const sepFiles = await Promise.all([...document.querySelectorAll(".list a[download]")].slice(0, 3).map(a => fetch(a.href).then(r => r.text())));
-    report({ rows, cells, checked, plain, files, zip, separate, sepFiles, errors });
+    report({ rows, cexRows, cells, checked, plain, files, zip, separate, sepFiles, errors });
   }
 })();
 </script>
@@ -56,7 +57,8 @@ m = re.search(r'<pre id="check-result">(.*?)</pre>', open(sys.argv[1], encoding=
 if not m: sys.exit("FAIL: no result within 60 s")
 r = json.loads(html.unescape(m.group(1)))
 if r["errors"]: sys.exit("FAIL: " + "; ".join(r["errors"]))
-if r["rows"] < 20: sys.exit(f"FAIL: only {r['rows']} exchanges in the matrix")
+if r["cexRows"] < 20: sys.exit(f"FAIL: only {r['cexRows']} CEX rows by default")
+if r["rows"] < r["cexRows"] + 30: sys.exit(f"FAIL: ticking DEX added only {r['rows'] - r['cexRows']} rows")
 if r["checked"] != r["cells"]: sys.exit(f"FAIL: select-all ticked {r['checked']} of {r['cells']} cells")
 lists = [l.split(",") for l in r["plain"]]
 syms = [s for l in lists for s in l]
@@ -72,5 +74,5 @@ if any(len(f) > 1000 for f in files): sys.exit("FAIL: a downloaded file exceeds 
 if sorted(s for f in files for s in f if not s.startswith("###")) != sorted(syms): sys.exit("FAIL: file symbols differ from the copied list")
 if r["separate"] < r["checked"]: sys.exit(f"FAIL: separate mode gave {r['separate']} lists for {r['checked']} cells")
 if any("###" in f for f in r["sepFiles"]): sys.exit("FAIL: sections still present with the option off")
-print(f"PASS: {r['rows']} exchanges, {r['cells']} cells, together {len(lists)} lists, separate {r['separate']} lists, {len(syms)} symbols")
+print(f"PASS: {r['cexRows']} CEX, {r['rows']} CEX+DEX exchanges, {r['cells']} cells, together {len(lists)} lists, separate {r['separate']} lists, {len(syms)} symbols")
 PY

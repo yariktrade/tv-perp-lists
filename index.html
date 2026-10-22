@@ -39,9 +39,10 @@ input[type=checkbox], input[type=radio] { accent-color: var(--accent); width: 16
 .top { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "name quote gear";
   align-items: center; gap: 8px 12px; }
 .name { grid-area: name; margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.opts { grid-area: quote; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.opts { grid-area: quote; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.field { display: flex; align-items: center; gap: 8px; }
 .gearwrap { grid-area: gear; position: relative; display: flex; }
-@media (max-width: 480px) {
+@media (max-width: 680px) {
   .top { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name gear" "quote quote"; }
   .opts { justify-self: start; }
 }
@@ -51,9 +52,8 @@ input[type=checkbox], input[type=radio] { accent-color: var(--accent); width: 16
   background: var(--surface); cursor: pointer; user-select: none; font-size: 13px; font-weight: 500; }
 .chip:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .matrix { overflow: clip; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
-/* Fixed layout: the exchange column takes 31%, the four market columns split the rest equally. */
+/* Fixed layout: each visible market column gets 17.25%, the exchange column takes the rest (31% with all four). */
 table { width: 100%; table-layout: fixed; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-col.name { width: 31%; }
 th, td { padding: 0; border-bottom: 1px solid var(--line); }
 thead th { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 1; background: var(--surface); font-size: 11px; font-weight: 500;
   text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); box-shadow: inset 0 -1px 0 var(--line); }
@@ -62,6 +62,7 @@ tbody tr:hover { background: var(--row); }
 tbody th { text-align: left; font-weight: 500; white-space: nowrap; }
 label.c { display: flex; align-items: center; gap: 7px; padding: 6px 10px; min-height: 34px; cursor: pointer; user-select: none; }
 label.c span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+label.c span small { display: block; overflow: hidden; text-overflow: ellipsis; font-size: 11px; font-weight: 400; color: var(--muted); line-height: 1.25; }
 /* Same left inset in every cell of a column, header included, so the checkboxes line up vertically. */
 td label.c, thead th:not(:first-child) label.c { padding-left: 14px; }
 td .n { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
@@ -129,10 +130,19 @@ textarea { width: 100%; height: 64px; resize: vertical; font-family: var(--f-mon
   <header class="top">
     <h1 class="name">Watchlist Builder</h1>
     <div class="opts">
-      <span class="lbl" id="quote-lbl">Quote</span>
-      <div class="grp" id="quotes" role="group" aria-labelledby="quote-lbl">
-        <label class="chip"><input type="checkbox" value="USDT" checked> USDT</label>
-        <label class="chip"><input type="checkbox" value="USDC"> USDC</label>
+      <div class="field">
+        <span class="lbl" id="venue-lbl">Venue</span>
+        <div class="grp" id="venues" role="group" aria-labelledby="venue-lbl">
+          <label class="chip"><input type="checkbox" value="cex" checked> CEX</label>
+          <label class="chip"><input type="checkbox" value="dex"> DEX</label>
+        </div>
+      </div>
+      <div class="field">
+        <span class="lbl" id="quote-lbl">Quote</span>
+        <div class="grp" id="quotes" role="group" aria-labelledby="quote-lbl">
+          <label class="chip"><input type="checkbox" value="USDT" checked> USDT</label>
+          <label class="chip"><input type="checkbox" value="USDC"> USDC</label>
+        </div>
       </div>
     </div>
     <div class="gearwrap">
@@ -163,7 +173,7 @@ textarea { width: 100%; height: 64px; resize: vertical; font-family: var(--f-mon
   </header>
   <div class="matrix">
     <table>
-      <colgroup><col class="name"><col><col><col><col></colgroup>
+      <colgroup id="cols"><col style="width:31%"><col><col><col><col></colgroup>
       <thead><tr id="head"></tr></thead>
       <tbody id="body"><tr><td class="off" colspan="5" style="padding:14px">Loading…</td></tr></tbody>
     </table>
@@ -180,9 +190,10 @@ textarea { width: 100%; height: 64px; resize: vertical; font-family: var(--f-mon
 // Source: TradingView's public symbol scanner, queried anonymously from this page (it
 // allows cross-origin requests and no cookies are sent), so every symbol is importable.
 // A derivative without a base currency is a stock, ETF, index, commodity or FX pair: "TradFi".
+// Exchanges come from the response itself; TradingView tags every symbol "cex" or "dex" (centralization).
 const SCANNER = "https://scanner.tradingview.com/crypto/scan";
 const TV_LIMIT = 1000; // symbols per TradingView watchlist
-const EXCHANGES = [ // centralised exchanges only, roughly by popularity
+const KNOWN = [ // display names; these CEXes lead in this order, every other exchange follows by symbol count
   ["BINANCE", "Binance"], ["BYBIT", "Bybit"], ["OKX", "OKX"], ["BITGET", "Bitget"], ["GATE", "Gate"], ["MEXC", "MEXC"],
   ["KUCOIN", "KuCoin"], ["BINGX", "BingX"], ["HTX", "HTX"], ["COINBASE", "Coinbase"], ["KRAKEN", "Kraken"],
   ["CRYPTOCOM", "Crypto.com"], ["UPBIT", "Upbit"], ["BITHUMB", "Bithumb"], ["BITFINEX", "Bitfinex"], ["WHITEBIT", "WhiteBIT"],
@@ -196,30 +207,54 @@ const EXCHANGES = [ // centralised exchanges only, roughly by popularity
 ];
 const KINDS = [["spot", "Spot"], ["perp", "Perps"], ["fut", "Futures"], ["tradfi", "TradFi"]];
 const KIND_FILE = { spot: "spot", perp: "perps", fut: "futures", tradfi: "tradfi" };
-const NAME = Object.fromEntries(EXCHANGES);
+const NAME = Object.fromEntries(KNOWN), RANK = Object.fromEntries(KNOWN.map(([id], i) => [id, i]));
+// DEX ids glue protocol, version and chain together (PANCAKESWAP3BSC); split them for display.
+// Unknown parts fall back to the raw id, so a new DEX still shows up, just less prettily.
+const DEX_PROTOCOLS = [["PANCAKESWAP", "PancakeSwap"], ["UNISWAP", "Uniswap"], ["RAYDIUM", "Raydium"], ["CURVE", "Curve"],
+  ["CAMELOT", "Camelot"], ["PULSEX", "PulseX"], ["KATANA", "Katana"], ["STONFI", "STON.fi"], ["QUICKSWAP", "QuickSwap"],
+  ["SUSHISWAP", "SushiSwap"], ["VELODROME", "Velodrome"], ["AERODROME", "Aerodrome"], ["METEORA", "Meteora"], ["TRADERJOE", "Trader Joe"],
+  ["SPOOKYSWAP", "SpookySwap"], ["SUNSWAP", "SunSwap"], ["ORCA", "Orca"], ["CETUS", "Cetus"], ["BLUEFIN", "Bluefin"], ["DEDUST", "DeDust"],
+  ["BISWAP", "Biswap"], ["BASESWAP", "BaseSwap"], ["PANGOLIN", "Pangolin"], ["PHARAOH", "Pharaoh"], ["HONEYSWAP", "Honeyswap"],
+  ["MMFINANCE", "MM Finance"], ["VVSFINANCE", "VVS Finance"], ["VVS", "VVS Finance"], ["SYNCSWAP", "SyncSwap"], ["BLACKHOLE", "Blackhole"],
+  ["LFJ", "LFJ"], ["TURBOSFINANCE", "Turbos Finance"], ["RAMSES", "Ramses"], ["ZKSWAP", "ZKSwap"]];
+const DEX_CHAINS = [["ETH", "Ethereum"], ["BSC", "BNB Chain"], ["BASE", "Base"], ["ARBITRUM", "Arbitrum"], ["POLYGON", "Polygon"],
+  ["OPTIMISM", "Optimism"], ["AVALANCHE", "Avalanche"], ["ZKSYNC", "zkSync"], ["UNICHAIN", "Unichain"]];
+const DEX_VARIANTS = { "2DOT2": "v2.2", CLMM: "CLMM", CPMM: "CPMM", DLMM: "DLMM", DYN: "Dynamic", SLIPSTREAM: "Slipstream" };
+function exParts(ex) {
+  if (NAME[ex]) return { title: NAME[ex], sub: "" };
+  const p = DEX_PROTOCOLS.find(([id]) => ex.startsWith(id));
+  if (!p) return { title: ex, sub: "" };
+  let rest = ex.slice(p[0].length);
+  const c = DEX_CHAINS.find(([id]) => rest.endsWith(id));
+  if (c) rest = rest.slice(0, -c[0].length);
+  const variant = /^\d+$/.test(rest) ? `v${rest}` : DEX_VARIANTS[rest] ?? rest;
+  return { title: p[1], sub: [variant, c && c[1]].filter(Boolean).join(" · ") };
+}
+const exName = ex => { const { title, sub } = exParts(ex); return sub ? `${title} ${sub}` : title; };
 
 const kindOf = (type, base) => type === "spot" ? "spot" : !base ? "tradfi" : type === "swap" ? "perp" : "fut";
 const key = (ex, k) => `${ex}|${k}`;
 const fmt = n => n.toLocaleString("en-US");
 
-async function scan(exchanges) {
-  const body = { columns: ["exchange", "type", "currency", "base_currency"], range: [0, 200000],
-    filter: [{ left: "exchange", operation: "in_range", right: exchanges },
-             { left: "type", operation: "in_range", right: ["spot", "swap", "futures"] },
+async function scan(exchanges) { // all exchanges when none are given
+  const body = { columns: ["exchange", "type", "currency", "base_currency", "centralization"], range: [0, 300000],
+    filter: [{ left: "type", operation: "in_range", right: ["spot", "swap", "futures"] },
              { left: "currency", operation: "in_range", right: ["USDT", "USDC"] }] };
+  if (exchanges) body.filter.push({ left: "exchange", operation: "in_range", right: exchanges });
   let r;
   // A plain-text body keeps this a simple CORS request (no preflight).
   try { r = await fetch(SCANNER, { method: "POST", body: JSON.stringify(body), cache: "no-store" }); }
   catch (_) { throw new Error("TradingView did not respond"); }
   if (!r.ok) throw new Error(`TradingView: HTTP ${r.status}`);
   const j = await r.json();
-  return j.data.map(x => ({ s: x.s, ex: x.d[0], k: kindOf(x.d[1], x.d[3]), q: x.d[2] }));
+  return j.data.map(x => ({ s: x.s, ex: x.d[0], k: kindOf(x.d[1], x.d[3]), q: x.d[2], v: x.d[4] }));
 }
 
 const $ = id => document.getElementById(id);
 const head = $("head"), body = $("body"), go = $("go"), out = $("out");
 const selected = new Set();
 let rows = [], counts = new Map(); // counts: key -> symbols in that cell under the ticked quotes
+let exchanges = [], venueOf = {};    // exchange order and "cex" / "dex" per exchange, from the load response
 
 const quotes = () => new Set([...$("quotes").querySelectorAll("input:checked")].map(i => i.value));
 function recount() {
@@ -227,8 +262,21 @@ function recount() {
   counts = new Map();
   for (const r of rows) if (qs.has(r.q)) counts.set(key(r.ex, r.k), (counts.get(key(r.ex, r.k)) || 0) + 1);
 }
-const visibleEx = () => EXCHANGES.map(e => e[0]).filter(ex => rows.some(r => r.ex === ex));
-const enabled = (ex, k) => (counts.get(key(ex, k)) || 0) > 0;
+const venues = () => new Set([...$("venues").querySelectorAll("input:checked")].map(i => i.value));
+function indexExchanges() {
+  const tags = {}, total = {};
+  for (const r of rows) {
+    total[r.ex] = (total[r.ex] || 0) + 1;
+    if (r.v) (tags[r.ex] ||= {})[r.v] = ((tags[r.ex] || {})[r.v] || 0) + 1;
+  }
+  venueOf = Object.fromEntries(Object.keys(total).map(ex => {
+    const t = tags[ex] || {};
+    return [ex, (t.dex || 0) > (t.cex || 0) ? "dex" : "cex"]; // majority tag; untagged counts as CEX
+  }));
+  const rank = ex => RANK[ex] ?? Infinity;
+  exchanges = Object.keys(total).sort((a, b) => (venueOf[a] === "dex") - (venueOf[b] === "dex") || rank(a) - rank(b) || total[b] - total[a] || a.localeCompare(b));
+}
+const enabled = (ex, k) => venues().has(venueOf[ex]) && (counts.get(key(ex, k)) || 0) > 0;
 
 function headerBox(label, aria, cells) {
   const th = document.createElement("th");
@@ -240,20 +288,22 @@ function headerBox(label, aria, cells) {
 }
 
 function buildTable() {
-  const exs = visibleEx();
+  const exs = exchanges;
   head.replaceChildren(headerBox("All", "Select the whole table", () => exs.flatMap(ex => KINDS.map(([k]) => [ex, k]))));
   for (const [k, label] of KINDS) head.append(headerBox(label, `Select column ${label}`, () => exs.map(ex => [ex, k])));
   body.replaceChildren();
   for (const ex of exs) {
     const tr = document.createElement("tr");
-    const th = headerBox(NAME[ex] || ex, `Select row ${NAME[ex] || ex}`, () => KINDS.map(([k]) => [ex, k]));
+    const { title, sub } = exParts(ex);
+    const th = headerBox(title, `Select row ${exName(ex)}`, () => KINDS.map(([k]) => [ex, k]));
+    if (sub) th.querySelector("span").append(Object.assign(document.createElement("small"), { textContent: sub }));
     th.setAttribute("scope", "row");
     tr.append(th);
     for (const [k, label] of KINDS) {
       const td = document.createElement("td");
       td.dataset.key = key(ex, k);
       td.innerHTML = `<label class="c"><input type="checkbox"> <span class="n"></span></label>`;
-      td.querySelector("input").setAttribute("aria-label", `${NAME[ex] || ex}: ${label}`);
+      td.querySelector("input").setAttribute("aria-label", `${exName(ex)}: ${label}`);
       td.querySelector("input").addEventListener("change", e => { e.target.checked ? selected.add(td.dataset.key) : selected.delete(td.dataset.key); refresh(); });
       tr.append(td);
     }
@@ -268,10 +318,15 @@ function buildTable() {
 }
 
 function refresh() {
-  // An exchange with nothing under the ticked quotes is hidden rather than shown as a row of dashes.
-  for (const tr of body.querySelectorAll("tr")) tr.hidden = ![...tr.querySelectorAll("td")].some(td => counts.get(td.dataset.key));
+  // An exchange of an unticked venue, or with nothing under the ticked quotes, is hidden rather than shown as a row of dashes;
+  // so is a market column that no visible exchange has (a DEX-only view keeps just Spot).
+  for (const tr of body.querySelectorAll("tr")) tr.hidden = ![...tr.querySelectorAll("td")].some(td => enabled(...td.dataset.key.split("|")));
+  const shown = KINDS.map(([k]) => exchanges.some(ex => enabled(ex, k)));
+  for (const tr of [head, ...body.querySelectorAll("tr")]) shown.forEach((on, i) => { tr.children[i + 1].hidden = !on; });
+  const n = shown.filter(Boolean).length;
+  $("cols").innerHTML = `<col style="width:${100 - n * 17.25}%">` + "<col>".repeat(n);
   for (const td of body.querySelectorAll("td")) {
-    const n = counts.get(td.dataset.key) || 0, box = td.querySelector("input");
+    const n = enabled(...td.dataset.key.split("|")) ? counts.get(td.dataset.key) : 0, box = td.querySelector("input");
     td.classList.toggle("off", !n);
     box.disabled = !n; box.hidden = !n;
     box.checked = !!n && selected.has(td.dataset.key);
@@ -284,7 +339,7 @@ function refresh() {
     box.checked = cells.length > 0 && on === cells.length;
     box.indeterminate = on > 0 && on < cells.length;
   }
-  const picked = [...selected].filter(c => counts.get(c));
+  const picked = [...selected].filter(c => enabled(...c.split("|")));
   const total = picked.reduce((s, c) => s + counts.get(c), 0);
   $("sel").textContent = picked.length ? `${fmt(total)} symbols` : "Nothing selected";
   go.disabled = !picked.length;
@@ -355,7 +410,7 @@ function zip(files) {
 let last = null; // { order, byCell } from the latest Generate; mode and sections re-render it without a new request
 
 async function run() {
-  const cells = [...selected].filter(c => counts.get(c));
+  const cells = [...selected].filter(c => enabled(...c.split("|")));
   const exs = [...new Set(cells.map(c => c.split("|")[0]))];
   const qs = quotes();
   go.disabled = true; go.textContent = "Loading…";
@@ -363,7 +418,7 @@ async function run() {
     const fresh = await scan(exs);
     const byCell = new Map(cells.map(c => [c, []]));
     for (const r of fresh) if (qs.has(r.q)) { const c = byCell.get(key(r.ex, r.k)); if (c) c.push(r.s); }
-    const order = visibleEx().flatMap(ex => KINDS.map(([k]) => key(ex, k))).filter(c => byCell.has(c) && byCell.get(c).length);
+    const order = exchanges.flatMap(ex => KINDS.map(([k]) => key(ex, k))).filter(c => byCell.has(c) && byCell.get(c).length);
     for (const c of order) byCell.get(c).sort();
     last = { order, byCell };
     render();
@@ -376,8 +431,8 @@ async function run() {
   out.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
 }
 
-const cellName = c => { const [ex, k] = c.split("|"); return `${NAME[ex] || ex} ${KINDS.find(x => x[0] === k)[1]}`; };
-const cellLabel = c => { const [ex, k] = c.split("|"); return `${NAME[ex] || ex} · ${KINDS.find(x => x[0] === k)[1]}`; };
+const cellName = c => { const [ex, k] = c.split("|"); return `${exName(ex).replace(/ · /g, " ")} ${KINDS.find(x => x[0] === k)[1]}`; };
+const cellLabel = c => { const [ex, k] = c.split("|"); return `${exName(ex)} · ${KINDS.find(x => x[0] === k)[1]}`; };
 const cellSlug = c => { const [ex, k] = c.split("|"); return `${ex.toLowerCase()}-${KIND_FILE[k]}`; };
 
 // Fill lists of at most TV_LIMIT entries; with sections on, each "###Name" header takes a slot too.
@@ -444,12 +499,13 @@ document.addEventListener("click", e => { if (!pop.hidden && !pop.contains(e.tar
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !pop.hidden) { setPop(false); gear.focus(); } });
 const STORE = "wb-settings", root = document.documentElement;
 function saveSettings() {
-  try { localStorage.setItem(STORE, JSON.stringify({ quotes: [...quotes()], mode: form("mode"), sections: $("sections").checked, theme: form("theme") })); }
+  try { localStorage.setItem(STORE, JSON.stringify({ venues: [...venues()], quotes: [...quotes()], mode: form("mode"), sections: $("sections").checked, theme: form("theme") })); }
   catch (_) {}
 }
 function restoreSettings() {
   let st = {};
   try { st = JSON.parse(localStorage.getItem(STORE)) || {}; } catch (_) {}
+  if (Array.isArray(st.venues)) for (const i of $("venues").querySelectorAll("input")) i.checked = st.venues.includes(i.value);
   if (Array.isArray(st.quotes)) for (const i of $("quotes").querySelectorAll("input")) i.checked = st.quotes.includes(i.value);
   if (st.mode === "together" || st.mode === "separate") document.querySelector(`input[name=mode][value=${st.mode}]`).checked = true;
   if (typeof st.sections === "boolean") $("sections").checked = st.sections;
@@ -469,14 +525,15 @@ $("theme").addEventListener("change", () => {
   saveSettings();
 });
 $("quotes").addEventListener("change", () => { saveSettings(); recount(); refresh(); });
+$("venues").addEventListener("change", () => { saveSettings(); refresh(); });
 restoreSettings();
 go.addEventListener("click", run);
 out.addEventListener("click", e => { const b = e.target.closest(".btn.ghost"); if (b) confirmClick(b); });
 
 (async () => {
-  try { rows = await scan(EXCHANGES.map(e => e[0])); }
+  try { rows = await scan(); }
   catch (err) { $("loaderr").textContent = `${err.message}. Reload the page.`; $("loaderr").hidden = false; return; }
-  recount(); buildTable(); refresh();
+  indexExchanges(); recount(); buildTable(); refresh();
 })();
 </script>
 </body>
