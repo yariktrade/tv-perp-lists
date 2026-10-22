@@ -200,7 +200,7 @@ function refresh() {
   }
   const picked = [...selected].filter(c => counts.get(c));
   const total = picked.reduce((s, c) => s + counts.get(c), 0);
-  $("sel").textContent = picked.length ? `${total} символов` : "";
+  $("sel").textContent = picked.length ? `Символов: ${total}` : "";
   go.disabled = !picked.length;
   out.hidden = true;
 }
@@ -276,7 +276,7 @@ async function run() {
     const slug = c => { const [ex, k] = c.split("|"); return `${ex.toLowerCase()}-${KIND_FILE[k]}`; };
     let lists;
     if (!all.length) out.append(note("Под этот выбор символов нет"));
-    else if (all.length <= TV_LIMIT) lists = [{ title: order.length === 1 ? label(order[0]) : `${order.length} ячеек`, items: all,
+    else if (all.length <= TV_LIMIT) lists = [{ title: order.length <= 3 ? order.map(label).join(" + ") : "Все выбранные", items: all,
       file: `tradingview-${order.length <= 3 ? order.map(slug).join("-") : "watchlist"}.txt` }];
     else {
       out.append(note(`В списке TradingView не больше ${TV_LIMIT} символов, поэтому по списку на ячейку`));
@@ -285,7 +285,7 @@ async function run() {
         file: `tradingview-${slug(c)}${arr.length > 1 ? "-" + (i + 1) : ""}.txt` })));
     }
     if (lists && lists.length > 1) {
-      const a = Object.assign(document.createElement("a"), { className: "btn ghost", textContent: `Скачать все ${lists.length} списков (.zip)`,
+      const a = Object.assign(document.createElement("a"), { className: "btn ghost", textContent: `Скачать все списки (.zip, ${lists.length} шт.)`,
         href: URL.createObjectURL(zip(lists.map(l => ({ name: l.file, text: l.items.join(",") })))), download: "tradingview-lists.zip" });
       const bar = document.createElement("div"); bar.className = "bar"; bar.append(a); out.append(bar);
     }
