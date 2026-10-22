@@ -6,8 +6,9 @@
 <title>Watchlist Builder</title>
 <meta name="description" content="Live USDT and USDC symbol lists from crypto exchanges, ready to import into TradingView: spot, perps, futures, TradFi">
 <script>
-  // Theme choice is remembered for this site in this browser only; "auto" follows the system.
-  try { const t = localStorage.getItem("wb-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (_) {}
+  // Settings are remembered for this site in this browser only (localStorage "wb-settings").
+  // The theme is applied here, before first paint; "auto" follows the system.
+  try { const t = (JSON.parse(localStorage.getItem("wb-settings")) || {}).theme; if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (_) {}
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -424,20 +425,34 @@ function setPop(open) {
 gear.addEventListener("click", () => setPop(pop.hidden));
 document.addEventListener("click", e => { if (!pop.hidden && !pop.contains(e.target) && !gear.contains(e.target)) setPop(false); });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !pop.hidden) { setPop(false); gear.focus(); } });
+const STORE = "wb-settings", root = document.documentElement;
+function saveSettings() {
+  try { localStorage.setItem(STORE, JSON.stringify({ quotes: [...quotes()], mode: form("mode"), sections: $("sections").checked, theme: form("theme") })); }
+  catch (_) {}
+}
+function restoreSettings() {
+  let st = {};
+  try { st = JSON.parse(localStorage.getItem(STORE)) || {}; } catch (_) {}
+  if (Array.isArray(st.quotes)) for (const i of $("quotes").querySelectorAll("input")) i.checked = st.quotes.includes(i.value);
+  if (st.mode === "together" || st.mode === "separate") document.querySelector(`input[name=mode][value=${st.mode}]`).checked = true;
+  if (typeof st.sections === "boolean") $("sections").checked = st.sections;
+  document.querySelector(`input[name=theme][value=${root.dataset.theme || "auto"}]`).checked = true;
+  markDefaults();
+}
+const markDefaults = () => { gear.querySelector(".dot").hidden = form("mode") === "together" && $("sections").checked; };
 function settingsChanged() {
-  gear.querySelector(".dot").hidden = form("mode") === "together" && $("sections").checked;
+  markDefaults(); saveSettings();
   if (last && !out.hidden) render();
 }
 $("mode").addEventListener("change", settingsChanged);
-const root = document.documentElement;
-document.querySelector(`input[name=theme][value=${root.dataset.theme || "auto"}]`).checked = true;
+$("sections").addEventListener("change", settingsChanged);
 $("theme").addEventListener("change", () => {
   const t = form("theme");
   if (t === "auto") delete root.dataset.theme; else root.dataset.theme = t;
-  try { t === "auto" ? localStorage.removeItem("wb-theme") : localStorage.setItem("wb-theme", t); } catch (_) {}
+  saveSettings();
 });
-$("sections").addEventListener("change", settingsChanged);
-$("quotes").addEventListener("change", () => { recount(); refresh(); });
+$("quotes").addEventListener("change", () => { saveSettings(); recount(); refresh(); });
+restoreSettings();
 go.addEventListener("click", run);
 
 (async () => {
