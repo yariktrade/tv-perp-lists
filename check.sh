@@ -9,6 +9,7 @@ cp index.html "$tmp/probe.html"
 cat >> "$tmp/probe.html" <<'JS'
 <script>
 const t0 = Date.now();
+let staleHidden = 0;
 const report = o => { const pre = document.createElement("pre"); pre.id = "check-result"; pre.textContent = JSON.stringify(o); document.body.append(pre); };
 (function waitTable() {
   const corner = document.querySelector("#head input");
@@ -33,6 +34,11 @@ const report = o => { const pre = document.createElement("pre"); pre.id = "check
     const bad = Object.keys(before).filter(ex => { const b = before[ex], a = after[ex] || [];
       return b.slice(0, -1).join() !== a.slice(0, b.length - 1).join() || b.at(-1) !== a.slice(b.length - 1).reduce((x, y) => x + y, 0); });
     if (cols < 7 || bad.length) return report({ errors: [`split TradFi: ${cols} visible columns, mismatched rows: ${bad.slice(0, 5).join(", ")}`] });
+    // Hide stale (on by default): switching it off may only add symbols.
+    const total = () => [...document.querySelectorAll("#body tr:not([hidden]) td:not([hidden]) .n")].reduce((x, n) => x + (+n.textContent || 0), 0);
+    const withFilter = total(); document.getElementById("fresh").click(); const without = total(); document.getElementById("fresh").click();
+    if (without < withFilter || !document.getElementById("fresh").checked) return report({ errors: [`stale filter: ${withFilter} with, ${without} without`] });
+    staleHidden = without - withFilter;
   }
   if (corner) document.querySelectorAll("#quotes input, #venues input").forEach(i => { if (!i.checked) i.click(); });
   if (!corner) { if (Date.now() - t0 < 30000) return setTimeout(waitTable, 200); return report({ errors: ["matrix did not load"] }); }
@@ -56,7 +62,7 @@ const report = o => { const pre = document.createElement("pre"); pre.id = "check
     const separate = document.querySelectorAll(".list").length;
     document.getElementById("sections").click();
     const sepFiles = await Promise.all([...document.querySelectorAll(".list a[download]")].slice(0, 3).map(a => fetch(a.href).then(r => r.text())));
-    report({ rows, cexRows, cells, checked, plain, files, zip, separate, sepFiles, errors });
+    report({ rows, cexRows, staleHidden, cells, checked, plain, files, zip, separate, sepFiles, errors });
   }
 })();
 </script>
@@ -86,5 +92,5 @@ if any(len(f) > 1000 for f in files): sys.exit("FAIL: a downloaded file exceeds 
 if sorted(s for f in files for s in f if not s.startswith("###")) != sorted(syms): sys.exit("FAIL: file symbols differ from the copied list")
 if r["separate"] < r["checked"]: sys.exit(f"FAIL: separate mode gave {r['separate']} lists for {r['checked']} cells")
 if any("###" in f for f in r["sepFiles"]): sys.exit("FAIL: sections still present with the option off")
-print(f"PASS: {r['cexRows']} CEX, {r['rows']} CEX+DEX exchanges, {r['cells']} cells, together {len(lists)} lists, separate {r['separate']} lists, {len(syms)} symbols")
+print(f"PASS: stale hidden by default {r['staleHidden']}, {r['cexRows']} CEX, {r['rows']} CEX+DEX exchanges, {r['cells']} cells, together {len(lists)} lists, separate {r['separate']} lists, {len(syms)} symbols")
 PY

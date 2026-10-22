@@ -42,7 +42,21 @@ input[type=checkbox], input[type=radio] { accent-color: var(--accent); width: 16
 .name { grid-area: name; margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .opts { grid-area: quote; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
 .field { display: flex; align-items: center; gap: 8px; }
-.gearwrap { grid-area: gear; position: relative; display: flex; }
+.gearwrap { grid-area: gear; position: relative; display: flex; gap: 8px; }
+.pop.log { width: min(380px, calc(100vw - 24px)); max-height: min(65vh, 520px); overflow: auto; align-content: start; }
+.logbody { display: grid; gap: 4px; }
+.day summary { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; cursor: pointer; font-size: 13px; list-style: none; }
+.day summary::-webkit-details-marker { display: none; }
+.day summary::before { content: "▸"; color: var(--muted); font-size: 11px; width: 10px; }
+.day[open] summary::before { content: "▾"; }
+.day .d { font-weight: 600; min-width: 56px; }
+.day .plus, .day .minus { font-family: var(--f-mono); font-size: 12px; }
+.day .plus { color: var(--accent); }
+.day .minus { color: var(--error); }
+.day .src { margin-left: auto; font-size: 11px; color: var(--muted); }
+.day .grp { display: grid; gap: 4px; padding: 2px 0 10px 20px; }
+.day .grp-head { display: flex; align-items: center; justify-content: space-between; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.day .syms { font-family: var(--f-mono); font-size: 11.5px; line-height: 1.5; overflow-wrap: anywhere; }
 @media (max-width: 680px) {
   .top { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name gear" "quote quote"; }
   .opts { justify-self: start; }
@@ -152,12 +166,20 @@ table.dense td label.c, table.dense thead th:not(:first-child) label.c { flex-di
       </div>
     </div>
     <div class="gearwrap">
+      <button type="button" class="icon" id="logbtn" aria-label="Changes" aria-expanded="false" aria-controls="changes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+      </button>
+      <div class="pop log" id="changes" role="group" aria-label="Changes" hidden>
+        <span class="lbl">Changes</span>
+        <div id="logbody" class="logbody"><p class="note">Loading…</p></div>
+      </div>
       <button type="button" class="icon" id="gear" aria-label="Settings" aria-expanded="false" aria-controls="settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
       <div class="pop" id="settings" role="group" aria-label="Settings" hidden>
         <span class="lbl">Table</span>
       <label class="pop-row" for="split"><span>Split TradFi by ticker</span><input type="checkbox" id="split"></label>
+      <label class="pop-row" for="fresh"><span>Hide stale (no price 7+ days)</span><input type="checkbox" id="fresh" checked></label>
       <hr>
       <span class="lbl" id="settings-lbl">Generation</span>
         <div class="pop-row"><span id="mode-lbl">Lists</span>
@@ -201,6 +223,7 @@ table.dense td label.c, table.dense thead th:not(:first-child) label.c { flex-di
 // Exchanges come from the response itself; TradingView tags every symbol "cex" or "dex" (centralization).
 const SCANNER = "https://scanner.tradingview.com/crypto/scan";
 const TV_LIMIT = 1000; // symbols per TradingView watchlist
+const STALE_DAYS = 7;  // "Hide stale": no price from TradingView for this long (a dead feed, a delisted pair)
 const KNOWN = [ // display names; these CEXes lead in this order, every other exchange follows by symbol count
   ["BINANCE", "Binance"], ["BYBIT", "Bybit"], ["OKX", "OKX"], ["BITGET", "Bitget"], ["GATE", "Gate"], ["MEXC", "MEXC"],
   ["KUCOIN", "KuCoin"], ["BINGX", "BingX"], ["HTX", "HTX"], ["COINBASE", "Coinbase"], ["KRAKEN", "Kraken"],
@@ -265,7 +288,7 @@ const key = (ex, k) => `${ex}|${k}`;
 const fmt = n => n.toLocaleString("en-US");
 
 async function scan(exchanges) { // all exchanges when none are given
-  const body = { columns: ["exchange", "type", "currency", "base_currency", "centralization"], range: [0, 300000],
+  const body = { columns: ["exchange", "type", "currency", "base_currency", "centralization", "last-price-update-time"], range: [0, 300000],
     filter: [{ left: "type", operation: "in_range", right: ["spot", "swap"] },
              { left: "currency", operation: "in_range", right: ["USDT", "USDC"] }] };
   if (exchanges) body.filter.push({ left: "exchange", operation: "in_range", right: exchanges });
@@ -275,7 +298,9 @@ async function scan(exchanges) { // all exchanges when none are given
   catch (_) { throw new Error("TradingView did not respond"); }
   if (!r.ok) throw new Error(`TradingView: HTTP ${r.status}`);
   const j = await r.json();
-  return j.data.map(x => { const k = kindOf(x.d[1], x.d[3]); return { s: x.s, ex: x.d[0], k, sub: k === "tradfi" ? tradfiSub(x.s) : k, q: x.d[2], v: x.d[4] }; });
+  const staleBefore = Date.now() / 1000 - STALE_DAYS * 86400;
+  return j.data.map(x => { const k = kindOf(x.d[1], x.d[3]);
+    return { s: x.s, ex: x.d[0], k, sub: k === "tradfi" ? tradfiSub(x.s) : k, q: x.d[2], v: x.d[4], stale: !(x.d[5] > staleBefore) }; });
 }
 
 const $ = id => document.getElementById(id);
@@ -286,10 +311,11 @@ let exchanges = [], venueOf = {};    // exchange order and "cex" / "dex" per exc
 
 const quotes = () => new Set([...$("quotes").querySelectorAll("input:checked")].map(i => i.value));
 const cellOf = r => key(r.ex, splitOn() ? r.sub : r.k);
+const wanted = (r, qs) => qs.has(r.q) && !(r.stale && $("fresh").checked);
 function recount() {
   const qs = quotes();
   counts = new Map();
-  for (const r of rows) if (qs.has(r.q)) counts.set(cellOf(r), (counts.get(cellOf(r)) || 0) + 1);
+  for (const r of rows) if (wanted(r, qs)) counts.set(cellOf(r), (counts.get(cellOf(r)) || 0) + 1);
 }
 const venues = () => new Set([...$("venues").querySelectorAll("input:checked")].map(i => i.value));
 function indexExchanges() {
@@ -383,7 +409,10 @@ const chunk = (a, n) => a.length <= n ? [a] : Array.from({ length: Math.ceil(a.l
 
 // Clipboard API first; if the browser refuses, select the text and try the legacy copy (the selection stays visible).
 function copyText(text, ta) {
-  const fallback = () => { ta.focus(); ta.select(); try { document.execCommand("copy"); } catch (_) {} };
+  const fallback = () => {
+    if (!ta) { ta = Object.assign(document.createElement("textarea"), { value: text }); ta.style.cssText = "position:fixed;opacity:0"; document.body.append(ta); setTimeout(() => ta.remove(), 0); }
+    ta.focus(); ta.select(); try { document.execCommand("copy"); } catch (_) {}
+  };
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(fallback);
   else fallback();
 }
@@ -448,7 +477,7 @@ async function run() {
   try {
     const fresh = await scan(exs);
     const byCell = new Map(cells.map(c => [c, []]));
-    for (const r of fresh) if (qs.has(r.q)) { const c = byCell.get(cellOf(r)); if (c) c.push(r.s); }
+    for (const r of fresh) if (wanted(r, qs)) { const c = byCell.get(cellOf(r)); if (c) c.push(r.s); }
     const order = exchanges.flatMap(ex => kinds().map(([k]) => key(ex, k))).filter(c => byCell.has(c) && byCell.get(c).length);
     for (const c of order) byCell.get(c).sort();
     last = { order, byCell };
@@ -519,18 +548,66 @@ function render() {
 }
 
 const form = name => document.querySelector(`input[name=${name}]:checked`).value;
-const gear = $("gear"), pop = $("settings");
-function setPop(open) {
-  pop.hidden = !open;
-  gear.setAttribute("aria-expanded", String(open));
-  if (open) pop.querySelector("input:checked").focus();
+const gear = $("gear"), pop = $("settings"), logBtn = $("logbtn"), logPop = $("changes");
+const PANELS = [[gear, pop], [logBtn, logPop]];
+function setPanel(btn, panel, open) {
+  for (const [b, p] of PANELS) { const on = open && p === panel; p.hidden = !on; b.setAttribute("aria-expanded", String(on)); }
+  if (open && panel === pop) pop.querySelector("input:checked").focus();
+  if (open && panel === logPop) loadLog();
 }
-gear.addEventListener("click", () => setPop(pop.hidden));
-document.addEventListener("click", e => { if (!pop.hidden && !pop.contains(e.target) && !gear.contains(e.target)) setPop(false); });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && !pop.hidden) { setPop(false); gear.focus(); } });
+for (const [b, p] of PANELS) b.addEventListener("click", () => setPanel(b, p, p.hidden));
+document.addEventListener("click", e => {
+  for (const [b, p] of PANELS) if (!p.hidden && !p.contains(e.target) && !b.contains(e.target)) setPanel(b, p, false);
+});
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  for (const [b, p] of PANELS) if (!p.hidden) { setPanel(b, p, false); b.focus(); }
+});
+
+// Changes log: data/log.json is written once a day by .github/workflows/snapshot.yml (see scripts/snapshot.py).
+let changes = null;
+async function loadLog() {
+  if (!changes) {
+    try { const r = await fetch("data/log.json", { cache: "no-store" }); if (!r.ok) throw 0; changes = await r.json(); }
+    catch (_) { $("logbody").replaceChildren(note("The log is not available here.")); return; }
+  }
+  renderLog();
+}
+function renderLog() {
+  if (!changes || logPop.hidden) return;
+  const vs = venues(), qs = quotes();
+  const keep = sym => vs.has(venueOf[sym.split(":")[0]] || "cex") && qs.has(sym.includes("USDC") ? "USDC" : "USDT");
+  const fmtDay = d => new Date(d + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+  const days = changes.entries.map(e => ({ ...e, added: e.added.filter(keep), removed: e.removed.filter(keep) }))
+    .filter(e => e.added.length || e.removed.length);
+  const box = $("logbody");
+  box.replaceChildren();
+  if (!days.length) box.append(note("No changes for this venue and quote yet."));
+  for (const e of days) {
+    const det = document.createElement("details");
+    det.className = "day";
+    det.innerHTML = `<summary><span class="d"></span><span class="plus"></span><span class="minus"></span><span class="src"></span></summary>`;
+    det.querySelector(".d").textContent = fmtDay(e.date);
+    det.querySelector(".plus").textContent = `+${e.added.length}`;
+    det.querySelector(".minus").textContent = `−${e.removed.length}`;
+    det.querySelector(".src").textContent = e.source === "first-bar" ? "by first bar" : "";
+    for (const [label, list] of [["Added", e.added], ["Removed", e.removed]]) {
+      if (!list.length) continue;
+      const g = document.createElement("div");
+      g.className = "grp";
+      g.innerHTML = `<div class="grp-head"><span></span><button type="button" class="btn ghost">Copy</button></div><div class="syms"></div>`;
+      g.querySelector("span").textContent = label;
+      g.querySelector(".syms").textContent = list.join(", ");
+      g.querySelector("button").addEventListener("click", ev => { copyText(list.join(","), null); confirmClick(ev.currentTarget); });
+      det.append(g);
+    }
+    box.append(det);
+  }
+  box.append(Object.assign(document.createElement("p"), { className: "note", textContent: `Logged daily since ${fmtDay(changes.since)}` }));
+}
 const STORE = "wb-settings", root = document.documentElement;
 function saveSettings() {
-  try { localStorage.setItem(STORE, JSON.stringify({ venues: [...venues()], quotes: [...quotes()], split: $("split").checked, mode: form("mode"), sections: $("sections").checked, theme: form("theme") })); }
+  try { localStorage.setItem(STORE, JSON.stringify({ venues: [...venues()], quotes: [...quotes()], split: $("split").checked, fresh: $("fresh").checked, mode: form("mode"), sections: $("sections").checked, theme: form("theme") })); }
   catch (_) {}
 }
 function restoreSettings() {
@@ -541,6 +618,7 @@ function restoreSettings() {
   if (st.mode === "together" || st.mode === "separate") document.querySelector(`input[name=mode][value=${st.mode}]`).checked = true;
   if (typeof st.sections === "boolean") $("sections").checked = st.sections;
   if (typeof st.split === "boolean") $("split").checked = st.split;
+  if (typeof st.fresh === "boolean") $("fresh").checked = st.fresh;
   document.querySelector(`input[name=theme][value=${root.dataset.theme || "auto"}]`).checked = true;
 }
 function settingsChanged() {
@@ -554,8 +632,9 @@ $("theme").addEventListener("change", () => {
   if (t === "auto") delete root.dataset.theme; else root.dataset.theme = t;
   saveSettings();
 });
-$("quotes").addEventListener("change", () => { saveSettings(); recount(); refresh(); });
-$("venues").addEventListener("change", () => { saveSettings(); refresh(); });
+$("quotes").addEventListener("change", () => { saveSettings(); recount(); refresh(); renderLog(); });
+$("venues").addEventListener("change", () => { saveSettings(); refresh(); renderLog(); });
+$("fresh").addEventListener("change", () => { saveSettings(); recount(); refresh(); });
 // Switching the split keeps the choice: a ticked TradFi cell becomes all its sub-columns, and back.
 $("split").addEventListener("change", () => {
   const on = splitOn();
